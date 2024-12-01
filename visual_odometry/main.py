@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import glob
 
 
 class VisualOdometryPipeline:
@@ -19,8 +21,21 @@ class VisualOdometryPipeline:
                          [0, 7.188560000000e+02, 1.852157000000e+02],
                          [0, 0, 1]])
         elif ds == 1:
+            print("Using Malaga dataset")
+            images_path = os.path.join(
+                malaga_path, 'malaga-urban-dataset-extract-07_rectified_800x600_Images')
+            images = sorted(glob.glob(os.path.join(images_path, '*')))
+
+            left_images = images[2::2]
+            last_frame = len(left_images)
+
+            K = np.array([[621.18428, 0, 404.0076],
+                          [0, 621.18428, 309.05989],
+                          [0, 0, 1]])
+
             pass
         elif ds == 2:
+            print("Using parking dataset")
             pass
         else:
             assert (False)
