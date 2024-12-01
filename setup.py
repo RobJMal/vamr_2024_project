@@ -5,7 +5,12 @@ setup(name='visual_odometry',
       description='Vision Algorithms for Mobile Robots - Mini Project',
       long_description=open('README.md').read().strip(),
       packages=find_packages(),
-      install_requires=[],
+      install_requires=[
+          "numpy",
+          "matplotlib",
+          "opencv-python",
+          "pyyaml"
+      ],
       url="https://github.com/RobJMal/vamr_2024_project",
       license='MIT License',
       zip_safe=False,

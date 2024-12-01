@@ -1,0 +1,8 @@
+# Description: Parameters for the pipeline
+
+# module: keypoint_tracking
+keypoint_tracking:
+  # parameters for the keypoint tracking module
+  param_1: 0.5 
+  param_2: 0.5 # just examples
+  
