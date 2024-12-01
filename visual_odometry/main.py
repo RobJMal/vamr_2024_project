@@ -29,7 +29,8 @@ class VisualOdometryPipeline:
 
 
 def main():
-    pipeline = VisualOdometryPipeline()
+    param_server = ParamServer(os.path.join(os.path.dirname(os.path.dirname(__file__)), "params/pipeline_params.yaml"))
+    pipeline = VisualOdometryPipeline(param_server=param_server)
     pipeline.run()
 
 
