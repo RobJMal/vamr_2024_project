@@ -1,5 +1,9 @@
 # Description: Parameters for the pipeline
 
+initialization:
+  # parameters for the initialization module
+  bootstrap_frames: [0, 2]
+
 # module: keypoint_tracking
 keypoint_tracking:
   # parameters for the keypoint tracking module

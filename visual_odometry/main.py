@@ -10,6 +10,7 @@ from visual_odometry.common.enums import LogLevel
 from visual_odometry.common.enums import DataSet
 from visual_odometry.initialization import Initialization
 
+
 class VisualOdometryPipeline(BaseClass):
     def __init__(self, param_server: ParamServer, debug: LogLevel = LogLevel.INFO):
         super().__init__(debug)
@@ -56,7 +57,7 @@ class VisualOdometryPipeline(BaseClass):
             raise AssertionError("Invalid dataset selection")
 
         #  Bootstrap
-        bootstrap_frames = [0, 2]
+        bootstrap_frames = self._param_server["initialization"]["bootstrap_frames"]
         if dataset == DataSet.KITTI:
             img0_path = os.path.join(
                 self._dataset_paths["KITTI"], '05/image_0', f'{bootstrap_frames[0]:06d}.png')
@@ -87,7 +88,8 @@ class VisualOdometryPipeline(BaseClass):
             raise AssertionError("Invalid dataset selection")
 
         # TODO: implement initialization
-        initialization = Initialization(self._param_server, debug=LogLevel.INFO)
+        initialization = Initialization(
+            self._param_server, debug=LogLevel.INFO)
         state = initialization(img0, img1)
 
         # Continuous Operation
