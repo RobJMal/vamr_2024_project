@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 
 from visual_odometry.common.enums import LogLevel
 from visual_odometry.common import BaseClass
@@ -13,6 +14,7 @@ class KeypointTracker(BaseClass):
         self._info_print("Keypoint tracker initialized.")
 
         # TODO: retrieve required parameters from the ParamServer
+        self.params = param_server["keypoint_tracker"]
 
 
 
@@ -29,14 +31,46 @@ class KeypointTracker(BaseClass):
         :param current_image: Current image frame.
         :type current_image: np.ndarray        
         """
+        # TODO: might be enough to pass P and return the new P -> but then there is no visualization
         # specifically this method only needs state.P to return a new state P and previous_image, current_image
 
-        pass
+        P_old = state.P.copy()
+
+        P_old = P_old.T.reshape(-1, 1, 2).astype(np.float32)
+        
+        P_new, status, _ = cv2.calcOpticalFlowPyrLK(prevImg = previous_image,
+                                                    nextImg = current_image,
+                                                    prevPts = P_old,
+                                                    nextPts = None,
+                                                    winSize = self.params["winSize"],
+                                                    maxLevel = self.params["maxLevel"],
+                                                    criteria = self.params["criteria"],)
+
+        # get the matching points
+        P_new = P_new[status == 1]
+        P_old = P_old[status == 1]
+
+
+        # TODO: ourlier rejection ?
+        
+
+
+        # visualization
+        self._debug_visuaize(image = current_image,
+                             P_old = P_old,
+                             P_new = P_new)
+        self._debug_print(f"Keypoint tracking: {len(P_new)} keypoints tracked.")
 
 
     def visualize(self, *args, **kwargs):
         """Visualization method for debugging."""
-        pass
+        # get the axis from the figure
+        ax = self.debug_fig.gca()
+        ax.clear()
+
+        # plot the image
+        ax.imshow(self.current_image)
+
 
         
     

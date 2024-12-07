@@ -10,3 +10,10 @@ keypoint_tracking:
   param_1: 0.5 
   param_2: 0.5 # just examples
   
+# module: keypoint_tracker
+keypoint_tracker:
+  winSize: [20,20] 
+  maxLevel: 3
+  criteria_eps: 0.01
+  criteria_count: 10
+  outlier_threshold: 3

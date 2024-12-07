@@ -118,6 +118,8 @@ class VisualOdometryPipeline(BaseClass):
         """
 
 
+
+
 def main():
     param_server = ParamServer(os.path.join(os.path.dirname(
         os.path.dirname(__file__)), "params/pipeline_params.yaml"))
