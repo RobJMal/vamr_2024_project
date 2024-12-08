@@ -34,32 +34,43 @@ class KeypointTracker(BaseClass):
         # TODO: might be enough to pass P and return the new P -> but then there is no visualization
         # specifically this method only needs state.P to return a new state P and previous_image, current_image
 
-        P_old = state.P.copy()
 
-        P_old = P_old.T.reshape(-1, 1, 2).astype(np.float32)
+        P_old = state.P.copy()
         
+        P_old = P_old.T.reshape(-1, 1, 2).astype(np.float32)
+
         P_new, status, _ = cv2.calcOpticalFlowPyrLK(prevImg = previous_image,
                                                     nextImg = current_image,
                                                     prevPts = P_old,
                                                     nextPts = None,
                                                     winSize = self.params["winSize"],
                                                     maxLevel = self.params["maxLevel"],
-                                                    criteria = self.params["criteria"],)
+                                                    criteria = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, self.params["criteria_count"], self.params["criteria_eps"]))  
+
 
         # get the matching points
-        P_new = P_new[status == 1]
-        P_old = P_old[status == 1]
+        P_new_matching = P_new[status == 1]
+        P_old_matching = P_old[status == 1]
 
-
-        # TODO: ourlier rejection ?
+        # find the fundamental matrix with ransac
+        _, inliers = cv2.findFundamentalMat(P_old_matching, P_new_matching, cv2.FM_RANSAC)
+        if np.sum(inliers) < self.params["min_inliers"]:
+            raise ValueError(f"Not enough inliers found. Minimum {self.params['min_inliers']} required.")
         
-
+        P_new_matching = P_new_matching[inliers.ravel() == 1]
+        P_old_matching = P_old_matching[inliers.ravel() == 1]
+        
+        state.P = P_new_matching.T
 
         # visualization
         self._debug_visuaize(image = current_image,
-                             P_old = P_old,
-                             P_new = P_new)
+                             P_old_discarded = P_old[status == 0].T, # old points that are discarded
+                             P_old_matching = P_old_matching.T, # old points that are matched within the new frame
+                             P_new = P_new_matching.T, # new points that are matched with the old frame
+                             )  
         self._debug_print(f"Keypoint tracking: {len(P_new)} keypoints tracked.")
+
+        return state
 
 
     def visualize(self, *args, **kwargs):
@@ -69,8 +80,19 @@ class KeypointTracker(BaseClass):
         ax.clear()
 
         # plot the image
-        ax.imshow(self.current_image)
-
-
+        ax.imshow(kwargs["image"], cmap="gray")
+        ax.scatter(kwargs["P_old_discarded"][0, :], kwargs["P_old_discarded"][1, :], c="r", s=2, marker="x")
+        ax.scatter(kwargs["P_old_matching"][0, :], kwargs["P_old_matching"][1, :], c="b", s=2)
+        ax.scatter(kwargs["P_new"][0, :], kwargs["P_new"][1, :], c="g", s=5)
         
-    
+        #for i in range(kwargs["P_old_matching"].shape[1]):  
+        #    ax.plot([kwargs["P_old_matching"][0, i], kwargs["P_new"][0, i]], 
+        #            [kwargs["P_old_matching"][1, i], kwargs["P_new"][1, i]], c="magenta", linewidth=1)
+        
+        ax.plot(
+            np.stack([kwargs["P_old_matching"][0, :], kwargs["P_new"][0, :]], axis=0),
+            np.stack([kwargs["P_old_matching"][1, :], kwargs["P_new"][1, :]], axis=0),
+            color='magenta', linestyle='-', linewidth=1)
+
+        plt.draw()
+        plt.pause(.1)

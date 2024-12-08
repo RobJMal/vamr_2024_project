@@ -14,10 +14,10 @@ class BaseClass:
         if self.debug >= LogLevel.INFO:
             print(f"[{self.__class__.__name__}] {msg}")
 
-    def _debug_visuaize(self) -> None:
+    def _debug_visuaize(self, *args, **kwargs) -> None:
         """Helper method for debug visualization."""
         if self.debug >= LogLevel.VISUALIZATION:
-            self.visualize()
+            self.visualize(*args, **kwargs)
 
     def visualize(self, *args, **kwargs) -> None:
         raise NotImplementedError("Visualize method not needs to be implemented for the child class.")
