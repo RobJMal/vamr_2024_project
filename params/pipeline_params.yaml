@@ -4,16 +4,11 @@ initialization:
   # parameters for the initialization module
   bootstrap_frames: [0, 2]
 
-# module: keypoint_tracking
-keypoint_tracking:
-  # parameters for the keypoint tracking module
-  param_1: 0.5 
-  param_2: 0.5 # just examples
   
 # module: keypoint_tracker
 keypoint_tracker:
-  winSize: [20,20] 
-  maxLevel: 3
-  criteria_eps: 0.01
-  criteria_count: 10
-  outlier_threshold: 3
+  winSize: [20,20] # window size for the Lucas-Kanade tracker
+  maxLevel: 3 # maximum pyramid level for the Lucas-Kanade tracker
+  min_inliers: 10 # minimum number of inliers to track
+  criteria_eps: 0.01 # treshold for the Lucas-Kanade tracker
+  criteria_count: 10 # number of iterations for the Lucas-Kanade tracker
