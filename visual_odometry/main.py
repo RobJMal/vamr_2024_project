@@ -4,6 +4,7 @@ import glob
 import cv2
 import time
 import matplotlib.pyplot as plt
+import argparse
 
 from visual_odometry.common import ParamServer
 from visual_odometry.common import BaseClass
@@ -15,15 +16,20 @@ from visual_odometry.keypoint_tracking import KeypointTracker
 
 
 def parse_args():
-    import argparse
+    """Argument parses for command line arguments."""
+
     parser = argparse.ArgumentParser(description='Visual Odometry pipeline')
     parser.add_argument('--dataset', type=str, default='KITTI',
                         help='Dataset to run the pipeline on')
+    
     parser.add_argument('--debug', type=str, default='INFO',
-                        help='Debug level')
+                        help='Debug level: NONE INFO, DEBUG, VISUALIZATION')
+    
     parser.add_argument('--params', type=str, default='params/pipeline_params.yaml',
                         help='Path to the parameters file')
-    parser.add_argument('--no-bootstrap', action='store_false', help='Do not use bootstrap, initialize based on given keypoints')
+    
+    parser.add_argument('--no-bootstrap', action='store_false', 
+                        help='Do not use bootstrap, initialize based on given keypoints')
     
     return parser.parse_args()
 
@@ -76,6 +82,7 @@ class VisualOdometryPipeline(BaseClass):
 
         #  Bootstrap
         if use_bootstrap:
+            self._info_print("Using bootstrapping to find initial keypoints")
             bootstrap_frames = self._param_server["initialization"]["bootstrap_frames"]
             if dataset == DataSet.KITTI:
                 img0_path = os.path.join(
@@ -117,7 +124,9 @@ class VisualOdometryPipeline(BaseClass):
             prev_img = img1
 
         else:
+
             # do not use bootstrap, initialize with first frame and given keypoints
+            self._info_print("No bootstrapping, using provided keypoints")
             if dataset != DataSet.KITTI:
                 raise AssertionError(
                     "No keypoints provided for initialization for dataset other than KITTI")
@@ -132,19 +141,18 @@ class VisualOdometryPipeline(BaseClass):
             img0 = np.array(cv2.imread(img0_path, cv2.IMREAD_GRAYSCALE))
             prev_img = img0
 
+            # TODO: this should be removed in the final version
             plt.figure()
             plt.imshow(img0, cmap='gray')
-            plt.scatter(state.P[0,:].tolist(), state.P[1,:].tolist())
+            plt.scatter(state.P[0], state.P[1], c='r', s=5)
+            plt.title("Initial keypoints")
             plt.show()
 
-
-
-        # Continuous Operation
+        ### Continuous Operation ###
         keypoint_tracker = KeypointTracker(param_server=self._param_server, debug=self.debug)
 
-
         for i in range(from_index, to_index):
-            self._info_print(f"\n\nProcessing frame {i}\n=====================")
+            self._info_print(f"Processing frame {i}")
             if dataset == DataSet.KITTI:
                 image_path = os.path.join(self._dataset_paths["KITTI"], '05/image_0', f'{i:06d}.png')
                 image = np.array(cv2.imread(image_path, cv2.IMREAD_GRAYSCALE))
@@ -158,12 +166,11 @@ class VisualOdometryPipeline(BaseClass):
             else:
                 raise AssertionError("Invalid dataset selection")
             
+            # call the keypoint tracker
             state = keypoint_tracker(state, prev_img, image)
 
-
-
             # Makes sure that plots refresh
-            time.sleep(0.01)
+            time.sleep(0.01) 
         
             prev_img = image
 
@@ -171,17 +178,19 @@ class VisualOdometryPipeline(BaseClass):
 
 
 def main():
-    args = parse_args()
+    args = parse_args() # parse command line arguments
+
+    # load args
     dataset = DataSet[args.dataset]
     debug = LogLevel[args.debug]
     param_server_path = args.params
     use_bootstrap = args.no_bootstrap   
 
-
+    # init param server
     param_server = ParamServer(os.path.join(os.path.dirname(
         os.path.dirname(__file__)), param_server_path))
     
-
+    # init and run pipeline
     pipeline = VisualOdometryPipeline(param_server=param_server, debug=debug)
     pipeline.run(dataset=dataset, use_bootstrap=use_bootstrap)
 
