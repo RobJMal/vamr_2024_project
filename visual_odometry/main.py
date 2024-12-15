@@ -113,12 +113,10 @@ class VisualOdometryPipeline(BaseClass):
             else:
                 raise AssertionError("Invalid dataset selection")
 
-            # TODO: implement initialization
-            initialization = Initialization(
-                self._param_server, debug=LogLevel.INFO)
+            initialization = Initialization(param_server=self._param_server, debug=self.debug)
             
             # setup for continuous operation
-            state = initialization(img0, img1)
+            state = initialization(img0, img1, K, dataset == DataSet.KITTI)
             from_index = bootstrap_frames[1] + 1
             to_index = last_frame + 1
             prev_img = img1

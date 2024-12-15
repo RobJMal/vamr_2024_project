@@ -14,7 +14,7 @@ class BaseClass:
         if self.debug >= LogLevel.INFO:
             print(f"[{self.__class__.__name__}] {msg}")
 
-    def _debug_visuaize(self, *args, **kwargs) -> None:
+    def _debug_visualize(self, *args, **kwargs) -> None:
         """Helper method for debug visualization."""
         if self.debug >= LogLevel.VISUALIZATION:
             self.visualize(*args, **kwargs)

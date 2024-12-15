@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
+import os
 
 from visual_odometry.common.enums import LogLevel
 from visual_odometry.common import BaseClass
@@ -15,36 +17,105 @@ class Initialization(BaseClass):
         # TODO: retrieve required parameters from the ParamServer
 
         self.debug_fig = plt.figure()  # figure for visualization
+        self.ax = self.debug_fig.gca()
 
-    def __call__(self, image_0: np.ndarray, image_1: np.ndarray):
+    def __call__(self, image_0: np.ndarray, image_1: np.ndarray, K: np.ndarray, is_KITTI: bool):
         """Main method for initialization.
 
         :param state: State object containing information needed for initialization
         :param image_0: First frame selected for initialization.
         :type image_0: np.ndarray
         :param image_1: Second frame selected for initialization.
-        :type image_1: np.ndarray        
+        :type image_1: np.ndarray
+        :return: state of last bootstrap frame with initialized inlier keypoints (state.P) and associated landmarks (state.X)
+        :rtype: State
         """
-        # returns state object with initialized inlier keypoints (state.P) and associated landmarks (state.X)
 
         state: State = State()
 
-        self.visualize(image_0, title="Image 0")
-        self.visualize(image_1, title="Image 1")
+        keypoints_0, keypoints_1, matches = self.get_keypoints_and_matches(image_0, image_1)
+        self._debug_print(f"Before RANSAC: Number of keypoints in image_0 = {len(keypoints_0)}, Number of keypoints in image_1 = {len(keypoints_1)}, Number of matches = {len(matches)}")
+        self._debug_visualize(image=cv2.drawMatches(image_0, keypoints_0, image_1, keypoints_1, matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS), title="Keypoint matches before RANSAC")
+
+        # Use RANSAC to estimate essential matrix, E
+        points_0 = np.float32([keypoints_0[m.queryIdx].pt for m in matches])
+        points_1 = np.float32([keypoints_1[m.trainIdx].pt for m in matches])
+        E, mask = cv2.findEssentialMat(points_0, points_1, K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
+        
+        # Filter inliers
+        inliers_0 = points_0[mask.ravel() == 1]
+        inliers_1 = points_1[mask.ravel() == 1]
+        self._debug_print(f"After RANSAC: Number of inlier matches = {len(inliers_1)}")
+        self._debug_visualize(image=cv2.drawMatches(image_0, keypoints_0, image_1, keypoints_1, [m for i, m in enumerate(matches) if mask[i]], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS), title="Inlier matches after RANSAC")
+
+        # Recover relative pose
+        _, R, t, _ = cv2.recoverPose(E, inliers_0, inliers_1, K)
+
+        # Triangulate points
+        proj_matrix_0 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
+        proj_matrix_1 = K @ np.hstack((R, t))
+        points_4D_homogenous = cv2.triangulatePoints(proj_matrix_0, proj_matrix_1, inliers_0.T, inliers_1.T)
+        points_3D = points_4D_homogenous[:3, :] / points_4D_homogenous[3, :]
+
+        state.P = inliers_1.T
+        state.X = points_3D
+
+        # Compare the bootstrapped keypoints with the keypoints from exercise 7
+        if is_KITTI:
+            self._debug_visualize(image=image_0, title="Initial Keypoints", points=[self.get_ex7_keypoints(), inliers_0.T])
 
         return state
 
-    def visualize(self, image: np.ndarray, title: str = "Image"):
-        """Visualization method for debugging.
+    def get_keypoints_and_matches(self, image_0: np.ndarray, image_1: np.ndarray):
+        """Method to get the keypoints and matches between two images.
 
-        :param image: Image to be visualized.
-        :type image: np.ndarray
-        :param title: Title of the plot.
-        :type title: str
+        :param image_0: First image.
+        :type image_0: np.ndarray
+        :param image_1: Second image.
+        :type image_1: np.ndarray
+        :return: Keypoints of both images and matches.
+        :rtype: [cv2.KeyPoint], [cv2.KeyPoint], [cv2.DMatch]
         """
-        plt.figure(self.debug_fig.number)
-        plt.imshow(image, cmap='gray')
-        plt.title(title)
-        plt.axis('off')
-        plt.tight_layout()
+
+        # Use SIFT descriptor
+        sift = cv2.SIFT_create()
+
+        # Find keypoints and descriptors
+        keypoints_0, descriptors_0 = sift.detectAndCompute(image_0, None)
+        keypoints_1, descriptors_1 = sift.detectAndCompute(image_1, None)
+
+        # Match descriptors
+        bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+        matches = bf.match(descriptors_0, descriptors_1)
+
+        # Sort matches by distance (for easier visualization)
+        matches = sorted(matches, key=lambda x: x.distance)
+
+        return keypoints_0, keypoints_1, matches
+    
+    def get_ex7_keypoints(self):
+        """Method to get the keypoints from exercise 7.
+
+        :return: Keypoints from exercise 7.
+        :rtype: np.ndarray
+        """
+
+        kp = np.loadtxt(os.path.join(os.path.dirname(os.path.dirname(__file__)), "datasets/kitti/kp_for_debug.txt")).T
+        kp[[0,1]] = kp[[1,0]] # swap x and y
+
+        return kp
+
+    def visualize(self, *args, **kwargs):
+        # get the axis from the figure
+        plt.title(f"DEBUG VISUALIZATION - Initialization: {kwargs['title']}")
+
+        # plot the image
+        plt.imshow(kwargs['image'], cmap="gray")
+        if 'points' in kwargs:
+            colors = ['r', 'g']
+            labels = ['Ex7 Keypoints', 'Bootstrapped Keypoints']
+            for i in range(len(kwargs['points'])):
+                plt.scatter(kwargs['points'][i][0], kwargs['points'][i][1], c=colors[i], s=5, label=labels[i])
+            plt.legend()
+
         plt.show()

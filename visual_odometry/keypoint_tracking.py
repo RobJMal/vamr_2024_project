@@ -70,7 +70,7 @@ class KeypointTracker(BaseClass):
         state.P = P_new_matching.T # back to 2xN representation
 
         # visualization
-        self._debug_visuaize(image = current_image,
+        self._debug_visualize(image = current_image,
                              P_old_discarded = P_old[status == 0].T, # old points that are discarded
                              P_old_matching = P_old_matching.T, # old points that are matched within the new frame
                              P_new = P_new_matching.T, # new points that are matched with the old frame
