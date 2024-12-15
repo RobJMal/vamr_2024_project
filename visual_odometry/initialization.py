@@ -35,7 +35,7 @@ class Initialization(BaseClass):
 
         keypoints_0, keypoints_1, matches = self.get_keypoints_and_matches(image_0, image_1)
         self._debug_print(f"Before RANSAC: Number of keypoints in image_0 = {len(keypoints_0)}, Number of keypoints in image_1 = {len(keypoints_1)}, Number of matches = {len(matches)}")
-        self._debug_visualize(image=cv2.drawMatches(image_0, keypoints_0, image_1, keypoints_1, matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS), title="Keypoint matches before RANSAC")
+        self._debug_visualize(image=cv2.drawMatches(image_0, keypoints_0, image_1, keypoints_1, matches, None), title="Keypoint matches before RANSAC")
 
         # Use RANSAC to estimate essential matrix, E
         points_0 = np.float32([keypoints_0[m.queryIdx].pt for m in matches])
@@ -46,7 +46,7 @@ class Initialization(BaseClass):
         inliers_0 = points_0[mask.ravel() == 1]
         inliers_1 = points_1[mask.ravel() == 1]
         self._debug_print(f"After RANSAC: Number of inlier matches = {len(inliers_1)}")
-        self._debug_visualize(image=cv2.drawMatches(image_0, keypoints_0, image_1, keypoints_1, [m for i, m in enumerate(matches) if mask[i]], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS), title="Inlier matches after RANSAC")
+        self._debug_visualize(image=cv2.drawMatches(image_0, keypoints_0, image_1, keypoints_1, [m for i, m in enumerate(matches) if mask[i]], None), title="Inlier matches after RANSAC")
 
         # Recover relative pose
         _, R, t, _ = cv2.recoverPose(E, inliers_0, inliers_1, K)
@@ -87,9 +87,6 @@ class Initialization(BaseClass):
         # Match descriptors
         bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
         matches = bf.match(descriptors_0, descriptors_1)
-
-        # Sort matches by distance (for easier visualization)
-        matches = sorted(matches, key=lambda x: x.distance)
 
         return keypoints_0, keypoints_1, matches
     
