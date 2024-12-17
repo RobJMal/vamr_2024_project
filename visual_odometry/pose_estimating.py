@@ -36,8 +36,20 @@ class PoseEstimator(BaseClass):
         """
         distortion_matrix = np.zeros((1,1))
 
-        breakpoint()
+        # breakpoint()
+        
+        num_landmarks = state.X.shape[1]
+        num_keypoints = state.P.shape[1]
+        min_point_correspondence = min(num_keypoints, num_landmarks)
+    
+        # Transposing since cv2 inverts rows and cols representation
+        X_clipped = state.X[:, :min_point_correspondence].T
+        P_clipped = state.P[:, :min_point_correspondence].T
 
-        pose = cv2.solvePnPRansac(state.X, state.P, K_matrix, distortion_matrix)
+        pose = cv2.solvePnPRansac(X_clipped, P_clipped, K_matrix, distortion_matrix)
+
+        self._debug_print(f"Pose estimate: {pose}")
+
+        breakpoint()
 
         return pose
