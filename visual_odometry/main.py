@@ -13,6 +13,7 @@ from visual_odometry.common.enums import DataSet
 from visual_odometry.common import State    
 from visual_odometry.initialization import Initialization
 from visual_odometry.keypoint_tracking import KeypointTracker
+from visual_odometry.pose_estimating import PoseEstimator
 
 
 def parse_args():
@@ -148,6 +149,7 @@ class VisualOdometryPipeline(BaseClass):
 
         ### Continuous Operation ###
         keypoint_tracker = KeypointTracker(param_server=self._param_server, debug=self.debug)
+        pose_estimator = PoseEstimator(param_server=self._param_server, debug=self.debug)
 
         for i in range(from_index, to_index):
             self._info_print(f"Processing frame {i}")
@@ -166,6 +168,9 @@ class VisualOdometryPipeline(BaseClass):
             
             # call the keypoint tracker
             state = keypoint_tracker(state, prev_img, image)
+
+            # calling the pose estimator
+            pose = pose_estimator(state, K)
 
             # Makes sure that plots refresh
             time.sleep(0.01) 
