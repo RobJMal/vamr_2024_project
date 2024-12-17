@@ -25,4 +25,19 @@ class PoseEstimator(BaseClass):
         
         self.debug_fig = plt.figure()
 
-    
+    def __call__(self, state: State, K_matrix: np.ndarray):
+        """
+        Main method for pose estimation.
+
+        :param state: State object containing information about keypoints (2 x K) and their corresponding landmarks (3 x K)
+        :type State: State 
+        :param K:
+        :type: K: np.ndarray
+        """
+        distortion_matrix = np.zeros((1,1))
+
+        breakpoint()
+
+        pose = cv2.solvePnPRansac(state.X, state.P, K_matrix, distortion_matrix)
+
+        return pose
