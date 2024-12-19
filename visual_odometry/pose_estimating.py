@@ -34,9 +34,8 @@ class PoseEstimator(BaseClass):
         :param K:
         :type: K: np.ndarray
         """
-        distortion_matrix = np.zeros((1,1))
-
-        # breakpoint()
+        # Assuming no distortion
+        distortion_matrix = np.zeros((1,5))
         
         num_landmarks = state.X.shape[1]
         num_keypoints = state.P.shape[1]
@@ -46,10 +45,14 @@ class PoseEstimator(BaseClass):
         X_clipped = state.X[:, :min_point_correspondence].T
         P_clipped = state.P[:, :min_point_correspondence].T
 
-        pose = cv2.solvePnPRansac(X_clipped, P_clipped, K_matrix, distortion_matrix)
+        ret_val, rot_vec, trans_vec, inliers = cv2.solvePnPRansac(X_clipped, P_clipped, K_matrix, distortion_matrix)
+        rot_matrix, _ = cv2.Rodrigues(rot_vec)
 
-        self._debug_print(f"Pose estimate: {pose}")
+        if ret_val:
+            self._debug_print(f"Rotation Matrix: {rot_matrix}")
+            self._debug_print(f"Translation Vector: {trans_vec}")
+            self._debug_print(f"Inliers: {inliers}")
+        else:
+            self._debug_print("Pose estimation failed.")
 
-        breakpoint()
-
-        return pose
+        return rot_matrix, trans_vec

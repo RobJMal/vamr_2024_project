@@ -170,7 +170,7 @@ class VisualOdometryPipeline(BaseClass):
             state = keypoint_tracker(state, prev_img, image)
 
             # calling the pose estimator
-            pose = pose_estimator(state, K)
+            rot_matrix, trans_vec = pose_estimator(state, K)
 
             # Makes sure that plots refresh
             time.sleep(0.01) 
