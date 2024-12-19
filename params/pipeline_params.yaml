@@ -12,3 +12,7 @@ keypoint_tracker:
   min_inliers: 10 # minimum number of inliers to track
   criteria_eps: 0.01 # treshold for the Lucas-Kanade tracker
   criteria_count: 10 # number of iterations for the Lucas-Kanade tracker
+
+# module: pose_estimator
+pose_estimator:
+  param1: 0
