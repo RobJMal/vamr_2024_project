@@ -45,7 +45,9 @@ class PoseEstimator(BaseClass):
         X_clipped = state.X[:, :min_point_correspondence].T
         P_clipped = state.P[:, :min_point_correspondence].T
 
-        ret_val, rot_vec, trans_vec, inliers = cv2.solvePnPRansac(X_clipped, P_clipped, K_matrix, distortion_matrix)
+        ret_val, rot_vec, trans_vec, inliers = cv2.solvePnPRansac(X_clipped, P_clipped, K_matrix, 
+                                                                  distCoeffs=distortion_matrix, 
+                                                                  confidence=0.999)
         rot_matrix, _ = cv2.Rodrigues(rot_vec)
 
         if ret_val:
