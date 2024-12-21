@@ -44,6 +44,7 @@ class KeypointTracker(BaseClass):
         # specifically this method only needs state.P to return a new state P and previous_image, current_image
 
         P_old = state.P.copy()
+        X = state.X.copy()
         
         P_old = P_old.T.reshape(-1, 1, 2).astype(np.float32)
         P_new, status, _ = cv2.calcOpticalFlowPyrLK(prevImg = previous_image,
@@ -59,6 +60,10 @@ class KeypointTracker(BaseClass):
         P_new_matching = P_new[status == 1]
         P_old_matching = P_old[status == 1]
 
+        # select corresponding 3D points
+        X_matching = X[:,status.ravel() == 1]
+
+
         # find the fundamental matrix with ransac
         _, inliers = cv2.findFundamentalMat(P_old_matching, P_new_matching, cv2.FM_RANSAC)
         if np.sum(inliers) < self.params["min_inliers"]:
@@ -66,8 +71,10 @@ class KeypointTracker(BaseClass):
         
         P_new_matching = P_new_matching[inliers.ravel() == 1]
         P_old_matching = P_old_matching[inliers.ravel() == 1]
+        X_matching = X_matching[:, inliers.ravel() == 1]
         
         state.P = P_new_matching.T # back to 2xN representation
+        state.X = X_matching
 
         # visualization
         self._debug_visualize(image = current_image,
