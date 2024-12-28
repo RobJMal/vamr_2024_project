@@ -1,6 +1,8 @@
+from typing import Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+from numpy.typing import NDArray
 
 from visual_odometry.common.enums import LogLevel
 from visual_odometry.common import BaseClass
@@ -17,8 +19,6 @@ class KeypointTracker(BaseClass):
         :type param_server: ParamServer
         :param debug: Debug level.
         :type debug: LogLevel
-    
-        
         """
         super().__init__(debug)
         self._info_print("Keypoint tracker initialized.")
@@ -26,11 +26,10 @@ class KeypointTracker(BaseClass):
         # Retrieve required parameters from the ParamServer
         self.params = param_server["keypoint_tracker"]
         
-
         self.debug_fig = plt.figure() # figure for visualization
         ax = self.debug_fig.gca()
 
-    def __call__(self, state: State, previous_image: np.ndarray, current_image: np.ndarray):
+    def __call__(self, state: State, previous_image: np.ndarray, current_image: np.ndarray) -> State:
         """Main method for keypoint tracking.
         
         :param state: State object contaiing information about the current estimate

@@ -1,11 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+from numpy.typing import NDArray
 
 from visual_odometry.common.enums import LogLevel
 from visual_odometry.common import BaseClass
 from visual_odometry.common import State
 from visual_odometry.common import ParamServer
+from visual_odometry.common.state import Pose
 
 class PoseEstimator(BaseClass):
     def __init__(self, param_server: ParamServer, debug: LogLevel = LogLevel.INFO):
@@ -24,6 +26,14 @@ class PoseEstimator(BaseClass):
         self.params = param_server["pose_estimator"]
         
         self.debug_fig = plt.figure()
+
+    @staticmethod
+    def cvt_rot_trans_to_pose(rot_matrix: NDArray, trans_vec: NDArray) -> NDArray:
+        return np.block([
+            [rot_matrix, trans_vec],
+            [np.zeros((1, 3)), 1]
+            ])
+
 
     def __call__(self, state: State, K_matrix: np.ndarray):
         """

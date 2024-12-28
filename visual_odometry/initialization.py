@@ -115,4 +115,5 @@ class Initialization(BaseClass):
                 plt.scatter(kwargs['points'][i][0], kwargs['points'][i][1], c=colors[i], s=5, label=labels[i])
             plt.legend()
 
-        plt.show()
+        plt.draw()
+        plt.pause(.1)
