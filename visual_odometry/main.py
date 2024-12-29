@@ -17,6 +17,7 @@ from visual_odometry.common.enums import DataSet
 from visual_odometry.common import State
 from visual_odometry.initialization import Initialization
 from visual_odometry.keypoint_tracking import KeypointTracker
+from visual_odometry.landmark_triangulation import LandmarkTriangulation
 from visual_odometry.pose_estimating import PoseEstimator
 
 
@@ -52,6 +53,7 @@ class VisualOdometryPipeline(BaseClass):
 
         self.keypoint_tracker = KeypointTracker(param_server=self._param_server, debug=self.debug)
         self.pose_estimator = PoseEstimator(param_server=self._param_server, debug=self.debug)
+        self.landmark_triangulation = LandmarkTriangulation(param_server=self._param_server, debug=self.debug)
 
         self._info_print(
             f"VO monocular pipeline initialized\n - Log level: {debug.name}\n - ParamServer: {self._param_server}")
@@ -168,6 +170,13 @@ class VisualOdometryPipeline(BaseClass):
 
         # calling the pose estimator
         pose = PoseEstimator.cvt_rot_trans_to_pose(*self.pose_estimator(state, self.K))
+
+        # Find and triangulate new landmarks
+        n_state = self.landmark_triangulation(curr_image, prev_image, prev_state, pose)
+
+        state.C = n_state.C
+        state.F = n_state.F
+        state.Tau = n_state.Tau
 
         return state, pose
 

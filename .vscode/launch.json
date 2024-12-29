@@ -1,0 +1,45 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Pipeline - KITTI, Visualization",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/visual_odometry/main.py",
+            "args": [
+                "--dataset",
+                "KITTI",
+                "--debug",
+                "VISUALIZATION"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Run Pipeline - PARKING, Visualization",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/visual_odometry/main.py",
+            "args": [
+                "--dataset",
+                "PARKING",
+                "--debug",
+                "VISUALIZATION"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Run Pipeline - PARKING",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/visual_odometry/main.py",
+            "args": [
+                "--dataset",
+                "PARKING"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

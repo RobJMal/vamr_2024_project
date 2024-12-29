@@ -1,4 +1,5 @@
 from visual_odometry.common.enums import LogLevel
+from functools import wraps
 
 class BaseClass:
     def __init__(self, debug: LogLevel = LogLevel.INFO):
@@ -21,3 +22,28 @@ class BaseClass:
 
     def visualize(self, *args, **kwargs) -> None:
         raise NotImplementedError("Visualize method not needs to be implemented for the child class.")
+
+    @classmethod
+    def plot_debug(cls, func):
+        """Decorator implementation of _debug_visualize so that we're not restircted to a single visualize() call"""
+        @wraps(func)
+        def check(self, *args, **kwargs):
+            if self.debug >= LogLevel.VISUALIZATION:
+                return func(self, *args, **kwargs)
+        return check
+
+    def get_axs(self, *args, **kwargs):
+        """Return the axs object so that we can call the generic matplotlib plotting library without worrying about specific functions"""
+        if self.debug >= LogLevel.VISUALIZATION:
+            return self._get_axs_impl(*args, **kwargs)
+        return NoOpAxis()
+
+    def _get_axs_impl(self, *args, **kwargs):
+        raise NotImplementedError("Implement the logic to get the figure axis for the corresponding class")
+
+class NoOpAxis:
+    """A no-op axis that does nothing when plotting methods are called."""
+    def __getattr__(self, name):
+        def no_op(*args, **kwargs):
+            pass
+        return no_op

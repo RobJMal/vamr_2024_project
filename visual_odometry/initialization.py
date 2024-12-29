@@ -7,6 +7,7 @@ from visual_odometry.common.enums import LogLevel
 from visual_odometry.common import BaseClass
 from visual_odometry.common import State
 from visual_odometry.common import ParamServer
+from visual_odometry.pose_estimating import PoseEstimator
 
 
 class Initialization(BaseClass):
@@ -59,6 +60,11 @@ class Initialization(BaseClass):
 
         state.P = inliers_1.T
         state.X = points_3D
+        state.C = inliers_1.T
+        state.F = inliers_1.T
+
+        transform = PoseEstimator.cvt_rot_trans_to_pose(R, t).reshape((-1, 1)) # Convert to transform vector
+        state.Tau = np.tile(transform, inliers_1.shape[0])
 
         # Compare the bootstrapped keypoints with the keypoints from exercise 7
         if is_KITTI:
@@ -66,7 +72,8 @@ class Initialization(BaseClass):
 
         return state
 
-    def get_keypoints_and_matches(self, image_0: np.ndarray, image_1: np.ndarray):
+    @staticmethod
+    def get_keypoints_and_matches(image_0: np.ndarray, image_1: np.ndarray):
         """Method to get the keypoints and matches between two images.
 
         :param image_0: First image.
