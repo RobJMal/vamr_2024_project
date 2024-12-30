@@ -19,7 +19,7 @@ class State:
     _X: Landmarks = field(default_factory=lambda: np.empty((3, 0)))  # 3xK "valid" landmarks
     _C: Keypoints = field(default_factory=lambda: np.empty((2, 0)))  # 2xM "candidate" keypoints
     _F: Keypoints = field(default_factory=lambda: np.empty((2, 0)))  # 2xM initial location of "candidate" keypoints
-    _Tau: PoseVectors = field(default_factory=lambda: np.empty((16, 0)))  # 16xM "candidate" pose vectors
+    _Tau: PoseVectors = field(default_factory=lambda: np.empty((16, 0)))  # 16xM "candidate" pose vectors always in WORLD FRAME (extrinsic)
 
     @property
     def P(self) -> Keypoints:

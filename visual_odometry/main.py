@@ -15,6 +15,7 @@ from visual_odometry.common import BaseClass
 from visual_odometry.common.enums import LogLevel
 from visual_odometry.common.enums import DataSet
 from visual_odometry.common import State
+from visual_odometry.common.state import Pose
 from visual_odometry.initialization import Initialization
 from visual_odometry.keypoint_tracking import KeypointTracker
 from visual_odometry.landmark_triangulation import LandmarkTriangulation
@@ -49,6 +50,7 @@ class VisualOdometryPipeline(BaseClass):
                                "MALAGA": os.path.join(os.path.dirname(os.path.dirname(__file__)), "datasets/malaga-urban-dataset-extract-07"),
                                "PARKING": os.path.join(os.path.dirname(os.path.dirname(__file__)), "datasets/parking")}
 
+        self._init_figures()
         self.left_images: Optional[list[str]] = None # Will be None if dataset is not Malaga
 
         self.keypoint_tracker = KeypointTracker(param_server=self._param_server, debug=self.debug)
@@ -150,6 +152,7 @@ class VisualOdometryPipeline(BaseClass):
 
             # setup for continuous operation
             state = initialization(img0, img1, self.K, dataset == DataSet.KITTI)
+            self.world_pose: NDArray = state.Tau[:, 0].reshape((4, 4))
             from_index = bootstrap_frames[1] + 1
             to_index = self.last_frame + 1
             prev_img = img1
@@ -171,8 +174,11 @@ class VisualOdometryPipeline(BaseClass):
         # calling the pose estimator
         pose = PoseEstimator.cvt_rot_trans_to_pose(*self.pose_estimator(state, self.K))
 
+        self._plot_pose((0, 0), pose, False)
+
         # Find and triangulate new landmarks
-        n_state = self.landmark_triangulation(curr_image, prev_image, prev_state, pose)
+        # WIP
+        n_state = self.landmark_triangulation(self.K, curr_image, prev_image, prev_state, pose)
 
         state.C = n_state.C
         state.F = n_state.F
@@ -180,14 +186,62 @@ class VisualOdometryPipeline(BaseClass):
 
         return state, pose
 
+    @BaseClass.plot_debug
+    def _init_figures(self):
+        self.vis_figure, self.vis_axs = plt.subplots(2, 2, figsize=(20, 10))
+        self.vis_axs[0, 0].remove()
+        self.vis_axs[0, 0] = self.vis_figure.add_subplot(2, 2, 1, projection='3d')
+        self.vis_figure.suptitle("Visual Odometry Pipeline")
+
+    @BaseClass.plot_debug
+    def _clear_figures(self):
+        for ax in self.vis_axs.flat:
+            ax.clear()
+
+    @BaseClass.plot_debug
+    def _refresh_figures(self):
+        self.vis_figure.canvas.draw_idle()
+        for ax in self.vis_axs.flat:
+            ax.legend()
+        plt.pause(.1)
+
+    @BaseClass.plot_debug
+    def _plot_pose(self, fig_id: Tuple[int, int], pose: Pose, isWorld: bool):
+        """
+        Pose is always extrinsic (camera frame wrt world frame) so we can directly plot is.
+        """
+        # Camera position (origin of the camera frame)
+        scale = 0.3
+        R = pose[:3, :3]
+        t = pose[:3, 3]
+
+        x_axis = (R[:, 0] - t) * scale
+        y_axis = (R[:, 1] - t) * scale
+        z_axis = (R[:, 2] - t) * scale
+
+        # Plot the camera position as a red dot
+        self.vis_axs[*fig_id].scatter(t[0], t[1], t[2], color='black' if isWorld else 'brown', s=10)
+
+        # Plot the camera axes (X, Y, Z axes) using the rotation matrix
+        self.vis_axs[*fig_id].quiver(t[0], t[1], t[2], x_axis[0], x_axis[1], x_axis[2], color='r', length=scale)
+        self.vis_axs[*fig_id].quiver(t[0], t[1], t[2], y_axis[0], y_axis[1], y_axis[2], color='g', length=scale)
+        self.vis_axs[*fig_id].quiver(t[0], t[1], t[2], z_axis[0], z_axis[1], z_axis[2], color='b', length=scale)
+
+
+
     def run(self, dataset: DataSet = DataSet.KITTI, use_bootstrap: bool = True):
         self._info_print(f"Running pipeline for dataset: {dataset.name}, bootstrap: {use_bootstrap}")
 
         state, image_range, prev_image = self._init_dataset(dataset, use_bootstrap)
+        self._plot_pose((0, 0), self.world_pose, True)
+
 
         ### Continuous Operation ###
         for frame_id in image_range:
             self._info_print(f"Processing frame {frame_id}")
+
+            # self._clear_figures()
+
             match dataset:
                 case DataSet.KITTI:
                     image_path = os.path.join(self._dataset_paths["KITTI"], '05/image_0', f'{frame_id:06d}.png')
@@ -205,11 +259,13 @@ class VisualOdometryPipeline(BaseClass):
             new_state, pose = self._process_frame(image, prev_image, state)
 
             # Makes sure that plots refresh
+            self._refresh_figures()
             time.sleep(0.01)
 
             # Prepare for the next iteration
             prev_image = image
             state = new_state
+
 
 
 def main():
@@ -225,10 +281,13 @@ def main():
     param_server = ParamServer(os.path.join(os.path.dirname(
         os.path.dirname(__file__)), param_server_path))
 
+    plt.ion()
+
     # init and run pipeline
     pipeline = VisualOdometryPipeline(param_server=param_server, debug=debug)
     pipeline.run(dataset=dataset, use_bootstrap=use_bootstrap)
 
+    plt.ioff()
 
 if __name__ == "__main__":
     main()

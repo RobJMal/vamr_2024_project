@@ -26,6 +26,8 @@ class KeypointTracker(BaseClass):
         # Retrieve required parameters from the ParamServer
         self.params = param_server["keypoint_tracker"]
         
+    @BaseClass.plot_debug
+    def _init_figure(self):
         self.debug_fig = plt.figure() # figure for visualization
         ax = self.debug_fig.gca()
 

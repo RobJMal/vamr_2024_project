@@ -25,10 +25,12 @@ class PoseEstimator(BaseClass):
         # Retrieve required parameters from the ParamServer
         self.params = param_server["pose_estimator"]
         
+    @BaseClass.plot_debug
+    def _init_figure(self):
         self.debug_fig = plt.figure()
 
     @staticmethod
-    def cvt_rot_trans_to_pose(rot_matrix: NDArray, trans_vec: NDArray) -> NDArray:
+    def cvt_rot_trans_to_pose(rot_matrix: NDArray, trans_vec: NDArray) -> Pose:
         return np.block([
             [rot_matrix, trans_vec],
             [np.zeros((1, 3)), 1]

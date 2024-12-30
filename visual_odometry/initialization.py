@@ -17,8 +17,12 @@ class Initialization(BaseClass):
 
         # TODO: retrieve required parameters from the ParamServer
 
+
+    @BaseClass.plot_debug
+    def _init_figure(self):
         self.debug_fig = plt.figure()  # figure for visualization
         self.ax = self.debug_fig.gca()
+
 
     def __call__(self, image_0: np.ndarray, image_1: np.ndarray, K: np.ndarray, is_KITTI: bool):
         """Main method for initialization.
@@ -42,14 +46,18 @@ class Initialization(BaseClass):
         points_0 = np.float32([keypoints_0[m.queryIdx].pt for m in matches])
         points_1 = np.float32([keypoints_1[m.trainIdx].pt for m in matches])
         E, mask = cv2.findEssentialMat(points_0, points_1, K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
-        
+
         # Filter inliers
         inliers_0 = points_0[mask.ravel() == 1]
         inliers_1 = points_1[mask.ravel() == 1]
         self._debug_print(f"After RANSAC: Number of inlier matches = {len(inliers_1)}")
         self._debug_visualize(image=cv2.drawMatches(image_0, keypoints_0, image_1, keypoints_1, [m for i, m in enumerate(matches) if mask[i]], None), title="Inlier matches after RANSAC")
 
-        # Recover relative pose
+        # Recover relative pose.
+        # Frame of ref: https://stackoverflow.com/questions/77522308/understanding-cv2-recoverposes-coordinate-frame-transformations
+        # The R, t rotations and translation from the first camera to the second camera.
+        # Thus, 3D points represented in the frame of camera 1 can be rotated and translated using R and t to get them wrt caemra 2.
+        # Notationally, R_cam2_wrt_cam1 * X_cam1 + t_cam2_wrt_cam1 = X_cam2. Thus this needs to be inverted to get the camera pose of camera 2.
         _, R, t, _ = cv2.recoverPose(E, inliers_0, inliers_1, K)
 
         # Triangulate points
@@ -63,7 +71,9 @@ class Initialization(BaseClass):
         state.C = inliers_1.T
         state.F = inliers_1.T
 
-        transform = PoseEstimator.cvt_rot_trans_to_pose(R, t).reshape((-1, 1)) # Convert to transform vector
+        R_cam2_wrt_world = R.T
+        t_cam2_wrt_world = -R.T @ t
+        transform = PoseEstimator.cvt_rot_trans_to_pose(R_cam2_wrt_world, t_cam2_wrt_world).reshape((-1, 1)) # Convert to transform vector
         state.Tau = np.tile(transform, inliers_1.shape[0])
 
         # Compare the bootstrapped keypoints with the keypoints from exercise 7
@@ -96,7 +106,7 @@ class Initialization(BaseClass):
         matches = bf.match(descriptors_0, descriptors_1)
 
         return keypoints_0, keypoints_1, matches
-    
+
     def get_ex7_keypoints(self):
         """Method to get the keypoints from exercise 7.
 
