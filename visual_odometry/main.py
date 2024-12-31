@@ -225,6 +225,9 @@ class VisualOdometryPipeline(BaseClass):
         Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera 
         is moving on a flat plane. 
         """
+        # Clearing the axes to show changes in landmarks
+        self.vis_axs[*fig_id].clear()
+
         # Camera pose and landmarks wrt world frame
         camera_t_wrt_world = pose[:3, 3]
         landmarks_wrt_world = state.X
