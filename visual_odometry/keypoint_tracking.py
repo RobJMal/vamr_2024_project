@@ -21,7 +21,10 @@ class KeypointTracker(BaseClass):
         :type debug: LogLevel
         """
         super().__init__(debug)
+        self._init_figure()
+
         self._info_print("Keypoint tracker initialized.")
+
 
         # Retrieve required parameters from the ParamServer
         self.params = param_server["keypoint_tracker"]

@@ -13,6 +13,7 @@ from visual_odometry.pose_estimating import PoseEstimator
 class Initialization(BaseClass):
     def __init__(self, param_server: ParamServer, debug: LogLevel = LogLevel.INFO):
         super().__init__(debug)
+        self._init_figure()
         self._info_print("Initialization initialized.")
 
         # TODO: retrieve required parameters from the ParamServer
