@@ -16,3 +16,12 @@ keypoint_tracker:
 # module: pose_estimator
 pose_estimator:
   param1: 0
+
+landmark_triangulation:
+  maxNumCandidateKeypoints: 100
+  keypointSequenceLength: 10
+  winSize: [20,20] # window size for the Lucas-Kanade tracker
+  maxLevel: 3 # maximum pyramid level for the Lucas-Kanade tracker
+  # min_inliers: 10 # minimum number of inliers to track
+  criteria_eps: 0.01 # treshold for the Lucas-Kanade tracker
+  criteria_count: 10 # number of iterations for the Lucas-Kanade tracker
