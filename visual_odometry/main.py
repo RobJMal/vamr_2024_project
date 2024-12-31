@@ -173,8 +173,8 @@ class VisualOdometryPipeline(BaseClass):
         # calling the pose estimator
         pose = PoseEstimator.cvt_rot_trans_to_pose(*self.pose_estimator(state, self.K))
 
-        self._plot_pose((0, 0), pose, False)
-        self._plot_pose_single_axes((0, 1), pose, True, frame_id)
+        self._plot_trajectory((0, 0), pose)
+        self._plot_trajectory_and_landmarks((0, 1), pose, state)
 
         # Find and triangulate new landmarks
         # WIP
@@ -190,7 +190,7 @@ class VisualOdometryPipeline(BaseClass):
     def _init_figures(self):
         self.vis_figure, self.vis_axs = plt.subplots(2, 2, figsize=(20, 10))
         self.vis_axs[0, 0].remove()
-        self.vis_axs[0, 0] = self.vis_figure.add_subplot(2, 2, 1, projection='3d')
+        self.vis_axs[0, 0] = self.vis_figure.add_subplot(2, 2, 1)
         self.vis_figure.suptitle("Visual Odometry Pipeline")
 
     @BaseClass.plot_debug
@@ -206,62 +206,43 @@ class VisualOdometryPipeline(BaseClass):
         plt.pause(.1)
 
     @BaseClass.plot_debug
-    def _plot_pose(self, fig_id: Tuple[int, int], pose: Pose, isWorld: bool):
+    def _plot_trajectory(self, fig_id: Tuple[int, int], pose: Pose):
         """
-        Pose is always extrinsic (camera frame wrt world frame) so we can directly plot is.
+        Plots the trajectory of the camera wrt the world frame. Plots only the x and z coordinates since the camera
+        is moving on a flat plane.
         """
-        # Camera position (origin of the camera frame)
-        scale = 0.3
-        R = pose[:3, :3]
-        t = pose[:3, 3]
+        # Camera pose wrt world frame
+        camera_t_wrt_world = pose[:3, 3]
 
-        x_axis = (R[:, 0] - t) * scale
-        y_axis = (R[:, 1] - t) * scale
-        z_axis = (R[:, 2] - t) * scale
+        self.vis_axs[*fig_id].set_title("Trajectory")
+        self.vis_axs[*fig_id].scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10)
+        self.vis_axs[*fig_id].set_xlabel("X position")
+        self.vis_axs[*fig_id].set_ylabel("Z position")
 
-        # Plot the camera position as a red dot
-        self.vis_axs[*fig_id].scatter(t[0], t[1], t[2], color='black' if isWorld else 'brown', s=10)
-
-        # Plot the camera axes (X, Y, Z axes) using the rotation matrix
-        self.vis_axs[*fig_id].quiver(t[0], t[1], t[2], x_axis[0], x_axis[1], x_axis[2], color='r', length=scale)
-        self.vis_axs[*fig_id].quiver(t[0], t[1], t[2], y_axis[0], y_axis[1], y_axis[2], color='g', length=scale)
-        self.vis_axs[*fig_id].quiver(t[0], t[1], t[2], z_axis[0], z_axis[1], z_axis[2], color='b', length=scale)
-
-    @BaseClass.plot_debug
-    def _plot_pose_single_axes(self, fig_id: Tuple[int, int], pose: Pose, isWorld: bool, iteration: int):
+    def _plot_trajectory_and_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State):
         """
-        Plots the pose from a single axis
+        Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera 
+        is moving on a flat plane. 
         """
-        # Camera position (origin of the camera frame)
-        t = pose[:3, 3]
+        # Clearing the axes to show changes in landmarks
+        self.vis_axs[*fig_id].clear()
 
-        # Plot the camera position as a red dot
-        fig_id = (0, 1)
-        self.vis_axs[*fig_id].set_title("X translation values over time")
-        self.vis_axs[*fig_id].scatter(iteration, t[0], color='black')
-        self.vis_axs[*fig_id].set_xlabel("Iteration")
-        self.vis_axs[*fig_id].set_ylabel("X translation value")
+        # Camera pose and landmarks wrt world frame
+        camera_t_wrt_world = pose[:3, 3]
+        landmarks_wrt_world = state.X
 
-        fig_id = (1, 0)
-        self.vis_axs[*fig_id].set_title("Y translation values over time")
-        self.vis_axs[*fig_id].scatter(iteration, t[1], color='black')
-        self.vis_axs[*fig_id].set_xlabel("Iteration")
-        self.vis_axs[*fig_id].set_ylabel("Y translation value")
-
-        fig_id = (1, 1)
-        self.vis_axs[*fig_id].set_title("Z translation values over time")
-        self.vis_axs[*fig_id].scatter(iteration, t[2], color='black')
-        self.vis_axs[*fig_id].set_xlabel("Iteration")
-        self.vis_axs[*fig_id].set_ylabel("Z translation value")
-
+        self.vis_axs[*fig_id].set_title("Trajectory and Landmarks")
+        self.vis_axs[*fig_id].scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
+        self.vis_axs[*fig_id].scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='black', s=10)
+        self.vis_axs[*fig_id].set_xlabel("X position")
+        self.vis_axs[*fig_id].set_ylabel("Z position")
 
     def run(self, dataset: DataSet = DataSet.KITTI, use_bootstrap: bool = True):
         self._info_print(f"Running pipeline for dataset: {dataset.name}, bootstrap: {use_bootstrap}")
 
         state, image_range, prev_image = self._init_dataset(dataset, use_bootstrap)
-        self._plot_pose((0, 0), self.world_pose, True)
-        self._plot_pose_single_axes((0, 1), self.world_pose, True, 0)
-
+        self._plot_trajectory((0, 0), self.world_pose)
+        self._plot_trajectory_and_landmarks((0, 1), self.world_pose, state)
 
         ### Continuous Operation ###
         for frame_id in image_range:

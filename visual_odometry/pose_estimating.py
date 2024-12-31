@@ -50,17 +50,20 @@ class PoseEstimator(BaseClass):
         distortion_matrix = np.zeros((1,5))
 
         # Transposing since cv2 inverts rows and cols representation
-        ret_val, rot_vec, trans_vec, inliers = cv2.solvePnPRansac(state.X.T, state.P.T, K_matrix, 
+        ret_val, rot_vec_wrt_camera, trans_vec_wrt_camera, inliers = cv2.solvePnPRansac(state.X.T, state.P.T, K_matrix, 
                                                                   useExtrinsicGuess=False,
                                                                   distCoeffs=distortion_matrix, 
                                                                   confidence=0.999)
-        rot_matrix, _ = cv2.Rodrigues(rot_vec)
+        rot_matrix_wrt_camera, _ = cv2.Rodrigues(rot_vec_wrt_camera)
+
+        rot_matrix_wrt_world = rot_matrix_wrt_camera.T
+        trans_vec_wrt_world = -rot_matrix_wrt_world @ trans_vec_wrt_camera
 
         if ret_val:
-            self._debug_print(f"Rotation Matrix: {rot_matrix}")
-            self._debug_print(f"Translation Vector: {trans_vec}")
+            self._debug_print(f"Rotation Matrix (wrt world frame): {rot_matrix_wrt_world}")
+            self._debug_print(f"Translation Vector (wrt to world frame): {trans_vec_wrt_world}")
             self._debug_print(f"Inliers: {inliers}")
         else:
             self._debug_print("Pose estimation failed.")
 
-        return rot_matrix, trans_vec
+        return rot_matrix_wrt_world, trans_vec_wrt_world
