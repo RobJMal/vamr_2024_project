@@ -48,16 +48,10 @@ class PoseEstimator(BaseClass):
         """
         # Assuming no distortion
         distortion_matrix = np.zeros((1,5))
-        
-        num_landmarks = state.X.shape[1]
-        num_keypoints = state.P.shape[1]
-        min_point_correspondence = min(num_keypoints, num_landmarks)
-    
-        # Transposing since cv2 inverts rows and cols representation
-        X_clipped = state.X[:, :min_point_correspondence].T
-        P_clipped = state.P[:, :min_point_correspondence].T
 
-        ret_val, rot_vec, trans_vec, inliers = cv2.solvePnPRansac(X_clipped, P_clipped, K_matrix, 
+        # Transposing since cv2 inverts rows and cols representation
+        ret_val, rot_vec, trans_vec, inliers = cv2.solvePnPRansac(state.X.T, state.P.T, K_matrix, 
+                                                                  useExtrinsicGuess=False,
                                                                   distCoeffs=distortion_matrix, 
                                                                   confidence=0.999)
         rot_matrix, _ = cv2.Rodrigues(rot_vec)
