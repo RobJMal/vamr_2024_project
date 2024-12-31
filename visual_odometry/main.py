@@ -166,7 +166,7 @@ class VisualOdometryPipeline(BaseClass):
                 "No keypoints provided for initialization for dataset other than KITTI")
         return self._get_kitti_debug_points()
 
-    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State) -> Tuple[State, NDArray]:
+    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int) -> Tuple[State, NDArray]:
         # From the previous image and previous state containing keypoints and landmarks,
         # figure out which keypoints carried over in the new image and return that set of P and X
         state = self.keypoint_tracker(prev_state, prev_image, curr_image)
@@ -175,6 +175,7 @@ class VisualOdometryPipeline(BaseClass):
         pose = PoseEstimator.cvt_rot_trans_to_pose(*self.pose_estimator(state, self.K))
 
         self._plot_pose((0, 0), pose, False)
+        self._plot_pose_single_axes((0, 1), pose, True, frame_id)
 
         # Find and triangulate new landmarks
         # WIP
@@ -227,6 +228,32 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].quiver(t[0], t[1], t[2], y_axis[0], y_axis[1], y_axis[2], color='g', length=scale)
         self.vis_axs[*fig_id].quiver(t[0], t[1], t[2], z_axis[0], z_axis[1], z_axis[2], color='b', length=scale)
 
+    @BaseClass.plot_debug
+    def _plot_pose_single_axes(self, fig_id: Tuple[int, int], pose: Pose, isWorld: bool, iteration: int):
+        """
+        Plots the pose from a single axis
+        """
+        # Camera position (origin of the camera frame)
+        t = pose[:3, 3]
+
+        # Plot the camera position as a red dot
+        fig_id = (0, 1)
+        self.vis_axs[*fig_id].set_title("X translation values over time")
+        self.vis_axs[*fig_id].scatter(iteration, t[0], color='black')
+        self.vis_axs[*fig_id].set_xlabel("Iteration")
+        self.vis_axs[*fig_id].set_ylabel("X translation value")
+
+        fig_id = (1, 0)
+        self.vis_axs[*fig_id].set_title("Y translation values over time")
+        self.vis_axs[*fig_id].scatter(iteration, t[1], color='black')
+        self.vis_axs[*fig_id].set_xlabel("Iteration")
+        self.vis_axs[*fig_id].set_ylabel("Y translation value")
+
+        fig_id = (1, 1)
+        self.vis_axs[*fig_id].set_title("Z translation values over time")
+        self.vis_axs[*fig_id].scatter(iteration, t[2], color='black')
+        self.vis_axs[*fig_id].set_xlabel("Iteration")
+        self.vis_axs[*fig_id].set_ylabel("Z translation value")
 
 
     def run(self, dataset: DataSet = DataSet.KITTI, use_bootstrap: bool = True):
@@ -234,6 +261,7 @@ class VisualOdometryPipeline(BaseClass):
 
         state, image_range, prev_image = self._init_dataset(dataset, use_bootstrap)
         self._plot_pose((0, 0), self.world_pose, True)
+        self._plot_pose_single_axes((0, 1), self.world_pose, True, 0)
 
 
         ### Continuous Operation ###
@@ -256,7 +284,7 @@ class VisualOdometryPipeline(BaseClass):
                     image = np.array(cv2.imread(image_path, cv2.IMREAD_GRAYSCALE))
                     image = cv2.convertScaleAbs(image)
 
-            new_state, pose = self._process_frame(image, prev_image, state)
+            new_state, pose = self._process_frame(image, prev_image, state, frame_id)
 
             # Makes sure that plots refresh
             self._refresh_figures()
