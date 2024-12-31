@@ -174,7 +174,8 @@ class VisualOdometryPipeline(BaseClass):
         # calling the pose estimator
         pose = PoseEstimator.cvt_rot_trans_to_pose(*self.pose_estimator(state, self.K))
 
-        self._plot_trajectory((0, 0), pose, False)
+        self._plot_trajectory((0, 0), pose)
+        self._plot_trajectory_and_landmarks((0, 1), pose, state)
 
         # Find and triangulate new landmarks
         # WIP
@@ -206,16 +207,32 @@ class VisualOdometryPipeline(BaseClass):
         plt.pause(.1)
 
     @BaseClass.plot_debug
-    def _plot_trajectory(self, fig_id: Tuple[int, int], pose: Pose, isWorld: bool):
+    def _plot_trajectory(self, fig_id: Tuple[int, int], pose: Pose):
         """
-        Pose is always extrinsic (camera frame wrt world frame) so we can directly plot is.
+        Plots the trajectory of the camera wrt the world frame. Plots only the x and z coordinates since the camera
+        is moving on a flat plane.
         """
         # Camera position (origin of the camera frame)
         t = pose[:3, 3]
 
         # Plot the camera position as a red dot
         self.vis_axs[*fig_id].set_title("Trajectory")
-        self.vis_axs[*fig_id].scatter(t[0], t[2], color='black' if isWorld else 'brown', s=10)
+        self.vis_axs[*fig_id].scatter(t[0], t[2], color='black', s=10)
+        self.vis_axs[*fig_id].set_xlabel("X position")
+        self.vis_axs[*fig_id].set_ylabel("Z position")
+
+    def _plot_trajectory_and_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State):
+        """
+        Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera 
+        is moving on a flat plane. 
+        """
+
+        t = pose[:3, 3]
+        landmarks = state.X
+
+        self.vis_axs[*fig_id].set_title("Trajectory and Landmarks")
+        self.vis_axs[*fig_id].scatter(t[0], t[2], color='red', s=10)
+        self.vis_axs[*fig_id].scatter(landmarks[0, :], landmarks[2, :], color='black', s=10)
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
@@ -223,7 +240,8 @@ class VisualOdometryPipeline(BaseClass):
         self._info_print(f"Running pipeline for dataset: {dataset.name}, bootstrap: {use_bootstrap}")
 
         state, image_range, prev_image = self._init_dataset(dataset, use_bootstrap)
-        self._plot_trajectory((0, 0), self.world_pose, True)
+        self._plot_trajectory((0, 0), self.world_pose)
+        self._plot_trajectory_and_landmarks((0, 1), self.world_pose, state)
 
         ### Continuous Operation ###
         for frame_id in image_range:
