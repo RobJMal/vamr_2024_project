@@ -212,12 +212,11 @@ class VisualOdometryPipeline(BaseClass):
         Plots the trajectory of the camera wrt the world frame. Plots only the x and z coordinates since the camera
         is moving on a flat plane.
         """
-        # Camera position (origin of the camera frame)
-        t = pose[:3, 3]
+        # Camera pose wrt world frame
+        camera_t_wrt_world = pose[:3, 3]
 
-        # Plot the camera position as a red dot
         self.vis_axs[*fig_id].set_title("Trajectory")
-        self.vis_axs[*fig_id].scatter(t[0], t[2], color='black', s=10)
+        self.vis_axs[*fig_id].scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10)
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
@@ -226,13 +225,13 @@ class VisualOdometryPipeline(BaseClass):
         Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera 
         is moving on a flat plane. 
         """
-
-        t = pose[:3, 3]
-        landmarks = state.X
+        # Camera pose and landmarks wrt world frame
+        camera_t_wrt_world = pose[:3, 3]
+        landmarks_wrt_world = state.X
 
         self.vis_axs[*fig_id].set_title("Trajectory and Landmarks")
-        self.vis_axs[*fig_id].scatter(t[0], t[2], color='red', s=10)
-        self.vis_axs[*fig_id].scatter(landmarks[0, :], landmarks[2, :], color='black', s=10)
+        self.vis_axs[*fig_id].scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
+        self.vis_axs[*fig_id].scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='black', s=10)
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
