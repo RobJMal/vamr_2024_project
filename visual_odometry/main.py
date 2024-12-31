@@ -148,10 +148,9 @@ class VisualOdometryPipeline(BaseClass):
             else:
                 raise AssertionError("Invalid dataset selection")
 
-            initialization = Initialization(param_server=self._param_server, debug=self.debug)
 
             # setup for continuous operation
-            state = initialization(img0, img1, self.K, dataset == DataSet.KITTI)
+            state = self.initialization(img0, img1, self.K, dataset == DataSet.KITTI)
             self.world_pose: NDArray = state.Tau[:, 0].reshape((4, 4))
             from_index = bootstrap_frames[1] + 1
             to_index = self.last_frame + 1

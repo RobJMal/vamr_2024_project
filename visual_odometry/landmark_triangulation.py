@@ -14,8 +14,8 @@ from visual_odometry.initialization import Initialization
 def checkIter(func):
 
     def wrapper(self, *args, **kwargs):
-        if self.iter < 2 or "forcePlot" in kwargs:
-            return func(self, *args, **kwargs)
+        # if self.iter < 2 or "forcePlot" in kwargs:
+        return func(self, *args, **kwargs)
 
     return wrapper
 
@@ -145,26 +145,27 @@ class LandmarkTriangulation(BaseClass):
 
         return R, t
 
-    def _triangulate_points(self, K, first_kp: State.Keypoints, first_pose: Pose, curr_kp: State.Keypoints, curr_R_ext: NDArray, curr_t_ext: NDArray, proj_mat_curr: NDArray) -> Tuple[bool, NDArray, float]:
+    def _triangulate_points(self, K, first_kp: State.Keypoints, first_pose: Pose, curr_kp: State.Keypoints, R_currCam_wrt_world: NDArray, t_currCam_wrt_world: NDArray, proj_mat_curr: NDArray) -> Tuple[bool, NDArray, float]:
         # Triangulate points
-        first_R_ext, first_t_ext = self._get_extrinsic_from_pose(first_pose)
-        proj_mat_first = K @ np.block([first_R_ext, first_t_ext])
+        R_firstCam_wrt_world, t_firstCam_wrt_world = self._get_extrinsic_from_pose(first_pose)
+        proj_mat_first = K @ np.block([R_firstCam_wrt_world, t_firstCam_wrt_world])
 
-        pX_C_world_4D = cv2.triangulatePoints(proj_mat_first, proj_mat_curr, first_kp.T, curr_kp.T)
-        pX_C_world_3D = pX_C_world_4D[:3, :] / pX_C_world_4D[3, :] # This is in the world frame.
+        pX_C_4D_wrt_first = cv2.triangulatePoints(proj_mat_first, proj_mat_curr, first_kp.T, curr_kp.T)
+        pX_C_wrt_first = pX_C_4D_wrt_first[:3, :] / pX_C_4D_wrt_first[3, :] # This is in the world frame.
 
         # Convert point to camera frame (vector from center of the camera to the point).
         # If the z axis is negative, the point is behind the camera and thus, has to be rejected
-        pX_C_camCurr_3D: NDArray = curr_R_ext.T @ pX_C_world_3D - curr_R_ext.T @ curr_t_ext
-        pX_C_camFirst_3D: NDArray = first_R_ext.T @ pX_C_world_3D - first_R_ext.T @ first_t_ext
+        pX_C_wrt_world: NDArray = R_firstCam_wrt_world.T @ pX_C_wrt_first - R_firstCam_wrt_world.T @ t_firstCam_wrt_world
+        pX_C_wrt_camCurr: NDArray = R_currCam_wrt_world @ pX_C_wrt_world + t_currCam_wrt_world
+        pX_C_wrt_camFirst: NDArray = pX_C_wrt_first
 
-        if pX_C_camCurr_3D[2] < 0 or pX_C_camFirst_3D[2] < 0:
-            self._debug_print(f"Projection behind the camera - z1: {pX_C_camCurr_3D[2] < 0} z2: {pX_C_camFirst_3D[2] < 0}")
+        if pX_C_wrt_camCurr[2] < 0 or pX_C_wrt_camFirst[2] < 0:
+            self._debug_print(f"Projection behind the camera - z1: {pX_C_wrt_camCurr[2] < 0} z2: {pX_C_wrt_camFirst[2] < 0}")
             return False, np.zeros(3), 0.0
 
-        alpha = np.acos(pX_C_camFirst_3D.T.dot(-pX_C_camCurr_3D) / (np.linalg.norm(pX_C_camCurr_3D) * np.linalg.norm(pX_C_camCurr_3D)))
+        alpha = np.acos(pX_C_wrt_camFirst.T.dot(-pX_C_wrt_camCurr) / (np.linalg.norm(pX_C_wrt_camCurr) * np.linalg.norm(pX_C_wrt_camCurr)))
 
-        return True, pX_C_world_3D, alpha
+        return True, pX_C_wrt_first, alpha
 
     def _get_new_landmarks(self, K: NDArray, C_new: State.Keypoints, F_new: State.Keypoints, Tau_new: State.PoseVectors, curr_pose: Pose):
         curr_R_ext, curr_t_ext = self._get_extrinsic_from_pose(curr_pose)
@@ -183,6 +184,10 @@ class LandmarkTriangulation(BaseClass):
         angles = angles[~np.isnan(angles)]
 
         print(f"Max Angle: {np.max(angles)} Min Angle: {np.min(angles)}")
+
+        # IDEA:
+        # if alpha > threshold:
+        #     pop C and X_C into P and X
 
     def perform_triangulation(self, K: NDArray, curr_image: MatLike, prev_image: MatLike, prev_state: State, curr_pose: Pose):
 

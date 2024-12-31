@@ -3,10 +3,14 @@ import matplotlib.pyplot as plt
 import cv2
 import os
 
+from numpy.typing import NDArray
+
 from visual_odometry.common.enums import LogLevel
 from visual_odometry.common import BaseClass
 from visual_odometry.common import State
 from visual_odometry.common import ParamServer
+from visual_odometry.common.plot_utils import PlotUtils
+from visual_odometry.common.state import Pose
 from visual_odometry.pose_estimating import PoseEstimator
 
 
@@ -21,8 +25,13 @@ class Initialization(BaseClass):
 
     @BaseClass.plot_debug
     def _init_figure(self):
-        self.debug_fig = plt.figure()  # figure for visualization
-        self.ax = self.debug_fig.gca()
+        self.vis_figure, self.vis_axs = plt.subplots(2, 1, figsize=(10, 12))  # figure for visualization
+        self.vis_axs[1].remove()
+        self.vis_axs[1] = self.vis_figure.add_subplot(2, 1, 2, projection='3d')
+        self.vis_axs[1].view_init(elev=-90, azim=45, roll=-45)
+        self.vis_axs[1].set_xlabel("World X")
+        self.vis_axs[1].set_ylabel("World Y")
+        self.vis_axs[1].set_zlabel("World Z")
 
 
     def __call__(self, image_0: np.ndarray, image_1: np.ndarray, K: np.ndarray, is_KITTI: bool):
@@ -59,27 +68,40 @@ class Initialization(BaseClass):
         # The R, t rotations and translation from the first camera to the second camera.
         # Thus, 3D points represented in the frame of camera 1 can be rotated and translated using R and t to get them wrt caemra 2.
         # Notationally, R_cam2_wrt_cam1 * X_cam1 + t_cam2_wrt_cam1 = X_cam2. Thus this needs to be inverted to get the camera pose of camera 2.
-        _, R, t, _ = cv2.recoverPose(E, inliers_0, inliers_1, K)
+        R_0_wrt_world, t_0_wrt_world = np.eye(3), np.zeros((3, 1))
+        _, R_1_wrt_0, t_1_wrt_0, _ = cv2.recoverPose(E, inliers_0, inliers_1, K)
 
         # Triangulate points
-        proj_matrix_0 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
-        proj_matrix_1 = K @ np.hstack((R, t))
-        points_4D_homogenous = cv2.triangulatePoints(proj_matrix_0, proj_matrix_1, inliers_0.T, inliers_1.T)
-        points_3D = points_4D_homogenous[:3, :] / points_4D_homogenous[3, :]
+        proj_matrix_0 = K @ np.hstack((R_0_wrt_world, t_0_wrt_world))
+        proj_matrix_1 = K @ np.hstack((R_1_wrt_0, t_1_wrt_0))
 
-        state.P = inliers_1.T
-        state.X = points_3D
-        state.C = inliers_1.T
-        state.F = inliers_1.T
+        # Points are triangulated wrt image 0
+        points_4D_homogenous_wrt_0 = cv2.triangulatePoints(proj_matrix_0, proj_matrix_1, inliers_0.T, inliers_1.T)
 
-        R_cam2_wrt_world = R.T
-        t_cam2_wrt_world = -R.T @ t
-        transform = PoseEstimator.cvt_rot_trans_to_pose(R_cam2_wrt_world, t_cam2_wrt_world).reshape((-1, 1)) # Convert to transform vector
-        state.Tau = np.tile(transform, inliers_1.shape[0])
+        points_3D_wrt_0 = points_4D_homogenous_wrt_0[:3, :] / points_4D_homogenous_wrt_0[3, :]
+        points_3D_wrt_1 = R_1_wrt_0 @ points_3D_wrt_0 + t_1_wrt_0
+        rejection_mask = (points_3D_wrt_0[2, :] < 0) | (points_3D_wrt_1[2, :] < 0)
+
+        rejected_pts = points_3D_wrt_0[:, rejection_mask]
+        self._debug_print(f"Rejecting: {rejected_pts.shape} points due to triangulation behind the camera")
+
+
+        state.P = inliers_0.T[:, ~rejection_mask]
+        state.X = points_3D_wrt_0[:, ~rejection_mask]
+        state.C = inliers_0.T[:, ~rejection_mask]
+        state.F = inliers_0.T[:, ~rejection_mask]
+
+        # R_cam2_wrt_world = R # R.T
+        # t_cam2_wrt_world = t # -R.T @ t
+        transform = PoseEstimator.cvt_rot_trans_to_pose(np.eye(3), np.zeros((3, 1))).reshape((-1, 1)) # Convert to transform vector
+        state.Tau = np.tile(transform, state.P.shape[1])
 
         # Compare the bootstrapped keypoints with the keypoints from exercise 7
         if is_KITTI:
             self._debug_visualize(image=image_0, title="Initial Keypoints", points=[self.get_ex7_keypoints(), inliers_0.T])
+
+        self.visualize_3d(state.P, state.X, transform.reshape((4, 4)))
+        self._refresh_figures()
 
         return state
 
@@ -120,18 +142,35 @@ class Initialization(BaseClass):
 
         return kp
 
+    @BaseClass.plot_debug
+    def visualize_3d(self, keypoints, landmarks, pose: Pose):
+        """
+        In the 3D axis, visualize the camera pose R, t;
+        visualize the keypoints, and visualize the 3D landmarks
+
+        Convention for this task is that landmarks are wrt the world frame (camera 1)
+        """
+        PlotUtils._plot_pose(self.vis_axs[1], pose, isWorld=True)
+        self.vis_axs[1].scatter(landmarks[0, :], landmarks[1, :], landmarks[2, :], label="Landmarks")
+
+
     def visualize(self, *args, **kwargs):
         # get the axis from the figure
-        plt.title(f"DEBUG VISUALIZATION - Initialization: {kwargs['title']}")
+        self.vis_figure.suptitle(f"DEBUG VISUALIZATION - Initialization: {kwargs['title']}")
 
         # plot the image
-        plt.imshow(kwargs['image'], cmap="gray")
+        self.vis_axs[0].imshow(kwargs['image'], cmap="gray")
         if 'points' in kwargs:
             colors = ['r', 'g']
             labels = ['Ex7 Keypoints', 'Bootstrapped Keypoints']
             for i in range(len(kwargs['points'])):
-                plt.scatter(kwargs['points'][i][0], kwargs['points'][i][1], c=colors[i], s=5, label=labels[i])
-            plt.legend()
+                self.vis_axs[0].scatter(kwargs['points'][i][0], kwargs['points'][i][1], c=colors[i], s=5, label=labels[i])
+            self.vis_axs[0].legend()
 
-        plt.draw()
+    @BaseClass.plot_debug
+    def _refresh_figures(self):
+        self.vis_figure.canvas.draw_idle()
+        for ax in self.vis_axs.flat:
+            ax.legend()
         plt.pause(.1)
+

@@ -64,7 +64,7 @@ class KeypointTracker(BaseClass):
         P_new_matching = P_new[status == 1]
         P_old_matching = P_old[status == 1]
 
-        # select corresponding 3D points
+        # select corresponding 3D points (still in the world frame as was in the input)
         X_matching = X[:,status.ravel() == 1]
 
 
