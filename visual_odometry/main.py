@@ -53,6 +53,7 @@ class VisualOdometryPipeline(BaseClass):
         self._init_figures()
         self.left_images: Optional[list[str]] = None # Will be None if dataset is not Malaga
 
+        self.initialization = Initialization(param_server=self._param_server, debug=self.debug)
         self.keypoint_tracker = KeypointTracker(param_server=self._param_server, debug=self.debug)
         self.pose_estimator = PoseEstimator(param_server=self._param_server, debug=self.debug)
         self.landmark_triangulation = LandmarkTriangulation(param_server=self._param_server, debug=self.debug)
