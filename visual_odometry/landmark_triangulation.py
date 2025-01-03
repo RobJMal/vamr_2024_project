@@ -11,6 +11,7 @@ from visual_odometry.common.plot_utils import PlotUtils
 from visual_odometry.common.state import Pose, State
 from visual_odometry.initialization import Initialization
 
+
 def checkIter(func):
 
     def wrapper(self, *args, **kwargs):
@@ -52,10 +53,18 @@ class LandmarkTriangulation(BaseClass):
         self.vis_figure.canvas.draw_idle()
         for ax in self.vis_axs.flat:
             ax.legend()
-        plt.pause(.5)
+        plt.pause(0.5)
 
     @BaseClass.plot_debug
-    def _plot_keypoints_and_landmarks(self, fig_id: Tuple[int, int], ext_pose: Pose, P: State.Keypoints, X: State.Landmarks, candidates=False, clear=False):
+    def _plot_keypoints_and_landmarks(
+        self,
+        fig_id: Tuple[int, int],
+        ext_pose: Pose,
+        P: State.Keypoints,
+        X: State.Landmarks,
+        candidates=False,
+        clear=False,
+    ):
         """
         Plots the keypoints and the landmarks.
 
@@ -74,9 +83,13 @@ class LandmarkTriangulation(BaseClass):
         # assert np.all(~(landmarks_wrt_camera[2, :] < 0)), "Landmarks for plotting wrt camera frame cannot be behind the camera"
 
         kp_scaled = PlotUtils._convert_pixels_to_world(P, ext_pose)
-        PlotUtils._plot_keypoints_and_landmarks(self.vis_axs[*fig_id], ext_pose, kp_scaled, landmarks_wrt_camera, candidates)
+        PlotUtils._plot_keypoints_and_landmarks(
+            self.vis_axs[*fig_id], ext_pose, kp_scaled, landmarks_wrt_camera, candidates
+        )
 
-    def _filter_lost_candidate_keypoints(self, curr_image: MatLike, prev_image: MatLike, prev_state: State) -> Tuple[State.Keypoints, State.Keypoints, State.PoseVectors]:
+    def _filter_lost_candidate_keypoints(
+        self, curr_image: MatLike, prev_image: MatLike, prev_state: State
+    ) -> Tuple[State.Keypoints, State.Keypoints, State.PoseVectors]:
         """
         We have candidate keypoints in the prev_state that correspond to the prev_image.
         Now, find keypoints in the curr_image that correspond to the candidate keypoints.
@@ -84,80 +97,96 @@ class LandmarkTriangulation(BaseClass):
 
         """
         C_prev = prev_state.C.T.reshape(-1, 1, 2).astype(np.float32)
-        C_new, status, _ = cv2.calcOpticalFlowPyrLK(prevImg = prev_image,
-                                                    nextImg = curr_image,
-                                                    prevPts = C_prev,
-                                                    nextPts = None,
-                                                    winSize = self.params["winSize"],
-                                                    maxLevel = self.params["maxLevel"],
-                                                    criteria = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, self.params["criteria_count"], self.params["criteria_eps"]))
-
+        C_new, status, _ = cv2.calcOpticalFlowPyrLK(
+            prevImg=prev_image,
+            nextImg=curr_image,
+            prevPts=C_prev,
+            nextPts=None,
+            winSize=self.params["winSize"],
+            maxLevel=self.params["maxLevel"],
+            criteria=(
+                cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,
+                self.params["criteria_count"],
+                self.params["criteria_eps"],
+            ),
+        )
 
         # get the matching points
         C_remaining = C_new[status == 1].T
-        F_remaining = prev_state.F[:, status.ravel()==1]
-        Tau_remaining = prev_state.Tau[:, status.ravel()==1]
+        F_remaining = prev_state.F[:, status.ravel() == 1]
+        Tau_remaining = prev_state.Tau[:, status.ravel() == 1]
 
-        self.viz_kp_difference((1, 0), C_remaining, prev_state.C, diff_color="red", diff_label="Lost KPs", ss_color="purple", ss_label="Carried Over KPs")
-        self._debug_print(f"After filtering, {status[status==1].shape[0]} keypoints from prev frame remain.")
+        self.viz_kp_difference(
+            (1, 0),
+            C_remaining,
+            prev_state.C,
+            diff_color="red",
+            diff_label="Lost KPs",
+            ss_color="purple",
+            ss_label="Carried Over KPs",
+        )
+        self._debug_print(
+            f"After filtering, {status[status==1].shape[0]} keypoints from prev frame remain."
+        )
 
         return C_remaining, F_remaining, Tau_remaining
 
-    def _remove_duplicate_candidates_and_add_F_and_Tau(self, carried_over_candidates, new_candidates, F, Tau, curr_pose: Pose) -> Tuple[State.Keypoints, State.Keypoints, State.PoseVectors]:
+    def _remove_duplicate_candidates_and_add_F_and_Tau(
+        self, carried_over_candidates, new_candidates, F, Tau, curr_pose: Pose
+    ) -> Tuple[State.Keypoints, State.Keypoints, State.PoseVectors]:
         new_F = np.copy(new_candidates)
         new_Tau = np.tile(curr_pose.reshape((-1, 1)), new_candidates.shape[1])
 
         all_candidates = np.hstack((carried_over_candidates, new_candidates))
         all_F = np.hstack((F, new_F))
         all_Tau = np.hstack((Tau, new_Tau))
-        self._info_print(f"Combining old and new candidates to get: {all_candidates.shape[1]}")
+        self._info_print(
+            f"Combining old and new candidates to get: {all_candidates.shape[1]}"
+        )
 
         _, idx = np.unique(all_candidates, return_index=True, axis=1)
 
         unique_candidates = all_candidates[:, idx]
         unique_F = all_F[:, idx]
         unique_Tau = all_Tau[:, idx]
-        self._info_print(f"After deduping, {unique_candidates.shape[1]} candidate keypoints selected to track")
-        self.viz_kp_difference((0, 1), unique_candidates, carried_over_candidates, diff_color="green", diff_label="New KPs", ss_color="purple", ss_label="Carried Over KPs")
+        self._info_print(
+            f"After deduping, {unique_candidates.shape[1]} candidate keypoints selected to track"
+        )
+        self.viz_kp_difference(
+            (0, 1),
+            unique_candidates,
+            carried_over_candidates,
+            diff_color="green",
+            diff_label="New KPs",
+            ss_color="purple",
+            ss_label="Carried Over KPs",
+        )
 
         return unique_candidates, unique_F, unique_Tau
 
-    def _provide_new_candidate_keypoints(self, curr_image: MatLike, prev_image: MatLike):
+    def _provide_new_candidate_keypoints(
+        self, curr_image: MatLike, prev_image: MatLike
+    ):
         """
         1. Find keypoint correspondances between the old and new images.
         2. Remove the ones that are already there in the filtered candidate keypoints
         """
-        kp_curr_raw, _, matches = Initialization.get_keypoints_and_matches(curr_image, prev_image)
+        kp_curr_raw, _, matches = Initialization.get_keypoints_and_matches(
+            curr_image, prev_image
+        )
 
-        new_candidates = np.array([kp_curr_raw[m.queryIdx].pt for m in matches], dtype=np.float32).T
+        new_candidates = np.array(
+            [kp_curr_raw[m.queryIdx].pt for m in matches], dtype=np.float32
+        ).T
         self._debug_print(f"Found: {new_candidates.shape[1]} new candidate keypoints")
         return new_candidates
-
-    # def _visualization_stuff_ignore(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, curr_pose: Pose) -> Tuple[State.Keypoints, State.Keypoints, State.PoseVectors]:
-
-    #     # # Visualize C_new and F_new, gradually we would like to see a drift here.
-    #     # self.viz_image((2, 1), curr_image, cmap="gray", label="Current Image", title="Final Candidates", forcePlot=True)
-    #     # # idx = np.random.randint(0, C_new.shape[1], size=np.clip(10, None, C_new.shape[1]))
-    #     # idx = np.arange(10)
-    #     # f_pts = F_new[:, idx]
-    #     # c_pts = C_new[:, idx]
-    #     # self.viz_keypoints((2, 1), f_pts, color="orange", label="F_new", alpha=0.5, forcePlot=True)
-    #     # self.viz_keypoints((2, 1), c_pts, color="red", label="C_new", alpha=0.5, forcePlot=True)
-
-    #     # for pt1, pt2 in zip(f_pts.T, c_pts.T):
-    #     #     X = [pt1[0], pt2[0]]
-    #     #     Y = [pt1[1], pt2[1]]
-    #     #     self.get_axs((2, 1), forcePlot=True).plot(X, Y)  # Plot all lines at once
 
     @staticmethod
     def _inv_homo_transform(T):
         R = T[:3, :3]
         t = T[:3, 3][:, None]
 
-        return np.block([
-            [R.T, -R.T @ t],
-            [0, 0, 0, 1]
-            ])
+        return np.block([[R.T, -R.T @ t], [0, 0, 0, 1]])
 
     @staticmethod
     def _get_extrinsic_from_pose(T: NDArray):
@@ -165,7 +194,20 @@ class LandmarkTriangulation(BaseClass):
         t = T[:3, 3][:, None]
         return R, t
 
-    def _get_landmarks_for_keypoints(self, K: NDArray, C: State.Keypoints, F: State.Keypoints, Tau: State.PoseVectors, curr_pose: Pose) -> Tuple[State.Keypoints, State.Landmarks, State.Keypoints, State.Keypoints, State.PoseVectors]:
+    def _get_landmarks_for_keypoints(
+        self,
+        K: NDArray,
+        C: State.Keypoints,
+        F: State.Keypoints,
+        Tau: State.PoseVectors,
+        curr_pose: Pose,
+    ) -> Tuple[
+        State.Keypoints,
+        State.Landmarks,
+        State.Keypoints,
+        State.Keypoints,
+        State.PoseVectors,
+    ]:
         """
         For the candidate keypoints, find out the landmarks that meet the threshold for getting added to the main queue,
 
@@ -180,25 +222,35 @@ class LandmarkTriangulation(BaseClass):
             tau: NDArray = tau.reshape((4, 4))
             proj_mat_f: NDArray = K @ tau[:3, :]
 
-            pX_C_wrt_w_4D: NDArray = cv2.triangulatePoints(proj_mat_f, proj_mat_curr, f, c)
+            pX_C_wrt_w_4D: NDArray = cv2.triangulatePoints(
+                proj_mat_f, proj_mat_curr, f, c
+            )
             pX_C_wrt_w = pX_C_wrt_w_4D[:3, :] / pX_C_wrt_w_4D[3, :]
             pX_C_wrt_f = tau @ np.vstack((pX_C_wrt_w, np.ones(1)))
             pX_C_wrt_c = curr_pose @ np.vstack((pX_C_wrt_w, np.ones(1)))
 
             # Possible improvement: Reproject and reject to clean up further
             if pX_C_wrt_f[2] < 0 or pX_C_wrt_c[2] < 0:
-                self._debug_print(f"Rejecting landmark since it's triangulated behind the camera: f: {pX_C_wrt_f[2] < 0} c: {pX_C_wrt_c[2] < 0}")
+                self._debug_print(
+                    f"Rejecting landmark since it's triangulated behind the camera: f: {pX_C_wrt_f[2] < 0} c: {pX_C_wrt_c[2] < 0}"
+                )
                 continue
 
-            alpha = np.arccos(pX_C_wrt_c.T @ pX_C_wrt_f / (np.linalg.norm(pX_C_wrt_c) * np.linalg.norm(pX_C_wrt_f)))
+            alpha = np.arccos(
+                pX_C_wrt_c.T
+                @ pX_C_wrt_f
+                / (np.linalg.norm(pX_C_wrt_c) * np.linalg.norm(pX_C_wrt_f))
+            )
             if np.isnan(alpha):
                 continue
             angles[cnt] = alpha
             points_world[:, cnt] = pX_C_wrt_w.ravel()
 
-        self._plot_keypoints_and_landmarks((1, 1), curr_pose, C, points_world, candidates=True, clear=False)
+        self._plot_keypoints_and_landmarks(
+            (1, 1), curr_pose, C, points_world, candidates=True, clear=False
+        )
 
-        eligible_keypoint_mask = angles > self.params['landmarkAngleThreshold']
+        eligible_keypoint_mask = angles > self.params["landmarkAngleThreshold"]
 
         P_new = C[:, eligible_keypoint_mask]
         X_new = points_world[:, eligible_keypoint_mask]
@@ -206,29 +258,61 @@ class LandmarkTriangulation(BaseClass):
         F_remain = F[:, ~eligible_keypoint_mask]
         Tau_remain = Tau[:, ~eligible_keypoint_mask]
 
-        self._info_print(f"Found {np.sum(eligible_keypoint_mask)} new landmarks to add to the queue. {np.sum(~eligible_keypoint_mask)} candidates remain.")
+        self._info_print(
+            f"Found {np.sum(eligible_keypoint_mask)} new landmarks to add to the queue. {np.sum(~eligible_keypoint_mask)} candidates remain."
+        )
 
         return P_new, X_new, C_remain, F_remain, Tau_remain
 
-
-    def perform_triangulation(self, K: NDArray, curr_image: MatLike, prev_image: MatLike, prev_state: State, curr_pose: Pose):
+    def perform_triangulation(
+        self,
+        K: NDArray,
+        curr_image: MatLike,
+        prev_image: MatLike,
+        prev_state: State,
+        curr_pose: Pose,
+    ):
 
         # Filter Lost Candidates First
-        self.viz_image((0, 0), curr_image, cmap="gray", label="Current Image", title="Lost KPs")
+        self.viz_image(
+            (0, 0), curr_image, cmap="gray", label="Current Image", title="Lost KPs"
+        )
         self._debug_print(f"Prev state number of candidates: {prev_state.C.shape[1]}")
-        C_filtered, F_filtered, Tau_filtered = self._filter_lost_candidate_keypoints(curr_image, prev_image, prev_state)
+        C_filtered, F_filtered, Tau_filtered = self._filter_lost_candidate_keypoints(
+            curr_image, prev_image, prev_state
+        )
 
         # Triangulate the points from the current candidates and evaluate the ones to Remove
-        P_new, X_new, C_remain, F_remain, Tau_remain = self._get_landmarks_for_keypoints(K, C_filtered, F_filtered, Tau_filtered, curr_pose)
+        P_new, X_new, C_remain, F_remain, Tau_remain = (
+            self._get_landmarks_for_keypoints(
+                K, C_filtered, F_filtered, Tau_filtered, curr_pose
+            )
+        )
 
         # Get new candidates from the current and previous frame
-        self.viz_image((0, 1), curr_image, cmap="gray", label="Current Image", title="Evaluated Candidates")
+        self.viz_image(
+            (0, 1),
+            curr_image,
+            cmap="gray",
+            label="Current Image",
+            title="Evaluated Candidates",
+        )
         new_candidates = self._provide_new_candidate_keypoints(curr_image, prev_image)
-        C_new, F_new, Tau_new = self._remove_duplicate_candidates_and_add_F_and_Tau(C_remain, new_candidates, F_remain, Tau_remain, curr_pose)
+        C_new, F_new, Tau_new = self._remove_duplicate_candidates_and_add_F_and_Tau(
+            C_remain, new_candidates, F_remain, Tau_remain, curr_pose
+        )
 
         return P_new, X_new, C_new, F_new, Tau_new
 
-    def __call__(self, K: NDArray, curr_image: MatLike, prev_image: MatLike, updated_state: State, prev_state: State, curr_pose: Pose) -> State:
+    def __call__(
+        self,
+        K: NDArray,
+        curr_image: MatLike,
+        prev_image: MatLike,
+        updated_state: State,
+        prev_state: State,
+        curr_pose: Pose,
+    ) -> State:
         """
         There are three steps here:
             1. Find which candidate keypoints are still there in the new image.
@@ -239,9 +323,18 @@ class LandmarkTriangulation(BaseClass):
         self._clear_figures()
         # self.viz_curr_and_prev_img(curr_image, prev_image)
 
-        self._plot_keypoints_and_landmarks((1, 1), curr_pose, updated_state.P, updated_state.X, candidates=False, clear=True)
+        self._plot_keypoints_and_landmarks(
+            (1, 1),
+            curr_pose,
+            updated_state.P,
+            updated_state.X,
+            candidates=False,
+            clear=True,
+        )
 
-        P_new, X_new, C_new, F_new, Tau_new = self.perform_triangulation(K, curr_image, prev_image, prev_state, curr_pose)
+        P_new, X_new, C_new, F_new, Tau_new = self.perform_triangulation(
+            K, curr_image, prev_image, prev_state, curr_pose
+        )
 
         updated_state.P = np.hstack((updated_state.P, P_new))
         updated_state.X = np.hstack((updated_state.X, X_new))
@@ -271,26 +364,54 @@ class LandmarkTriangulation(BaseClass):
 
     @BaseClass.plot_debug
     @checkIter
-    def viz_image(self, fig_idx: Tuple[int, int], image: MatLike, cmap: str, label: str, title=None, **kwargs):
+    def viz_image(
+        self,
+        fig_idx: Tuple[int, int],
+        image: MatLike,
+        cmap: str,
+        label: str,
+        title=None,
+        **kwargs,
+    ):
         self.vis_axs[*fig_idx].imshow(image, cmap=cmap, label=label)
         if title:
             self.vis_axs[*fig_idx].set_title(title)
 
     @BaseClass.plot_debug
     @checkIter
-    def viz_keypoints(self, fig_idx: Tuple[int, int], kps: NDArray, color: str, label: str, **kwargs):
+    def viz_keypoints(
+        self, fig_idx: Tuple[int, int], kps: NDArray, color: str, label: str, **kwargs
+    ):
         if "forcePlot" in kwargs:
             del kwargs["forcePlot"]
-        self.vis_axs[*fig_idx].scatter(kps[0, :], kps[1, :], color=color, label=f"{label}: {kps.shape[1]}", s=1.0, **kwargs)
+        self.vis_axs[*fig_idx].scatter(
+            kps[0, :],
+            kps[1, :],
+            color=color,
+            label=f"{label}: {kps.shape[1]}",
+            s=1.0,
+            **kwargs,
+        )
 
     @BaseClass.plot_debug
     @checkIter
-    def viz_kp_difference(self, fig_idx: Tuple[int, int], superset: State.Keypoints, subset: State.Keypoints, diff_color: str, diff_label: str, ss_color: str, ss_label: str):
+    def viz_kp_difference(
+        self,
+        fig_idx: Tuple[int, int],
+        superset: State.Keypoints,
+        subset: State.Keypoints,
+        diff_color: str,
+        diff_label: str,
+        ss_color: str,
+        ss_label: str,
+    ):
         """
         Visualize the set difference between superset and subset, and also the subset (in separate colors)
         """
         # The masking logic is wrapped here to reduce this computation if plotting is disabled
-        diff_mask = ~np.any(np.all(superset[:, :, None] == subset[:, None, :], axis=0), axis=1)
+        diff_mask = ~np.any(
+            np.all(superset[:, :, None] == subset[:, None, :], axis=0), axis=1
+        )
         diff_kps = superset[:, diff_mask]
         self.viz_keypoints(fig_idx, diff_kps, diff_color, diff_label)
         self.viz_keypoints(fig_idx, subset, ss_color, ss_label)
