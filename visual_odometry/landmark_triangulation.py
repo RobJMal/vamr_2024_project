@@ -1,13 +1,13 @@
 import cv2
-from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import Any, Dict, Tuple
+from typing import Tuple
 from cv2.typing import MatLike
 from numpy.typing import NDArray
 from visual_odometry.common.base_class import BaseClass
 from visual_odometry.common.enums.log_level import LogLevel
 from visual_odometry.common.params import ParamServer
+from visual_odometry.common.plot_utils import PlotUtils
 from visual_odometry.common.state import Pose, State
 from visual_odometry.initialization import Initialization
 
@@ -28,7 +28,6 @@ class LandmarkTriangulation(BaseClass):
         """
         super().__init__(debug)
         self.iter = 0
-        self.THRESH = {5, 10, 15}
         self._init_figures()
         self._info_print("Landmark Triangulation initialized.")
 
@@ -37,7 +36,7 @@ class LandmarkTriangulation(BaseClass):
 
     @BaseClass.plot_debug
     def _init_figures(self):
-        self.vis_figure, self.vis_axs = plt.subplots(3, 2, figsize=(20, 10))
+        self.vis_figure, self.vis_axs = plt.subplots(2, 2, figsize=(20, 8))
         self.vis_figure.suptitle("Landmark Triangulation Visualization")
 
     def _get_axs_impl(self, fig_idx):
@@ -53,7 +52,29 @@ class LandmarkTriangulation(BaseClass):
         self.vis_figure.canvas.draw_idle()
         for ax in self.vis_axs.flat:
             ax.legend()
-        plt.pause(.1)
+        plt.pause(.5)
+
+    @BaseClass.plot_debug
+    def _plot_keypoints_and_landmarks(self, fig_id: Tuple[int, int], ext_pose: Pose, P: State.Keypoints, X: State.Landmarks, candidates=False, clear=False):
+        """
+        Plots the keypoints and the landmarks.
+
+        P is in the camera frame, X is in the WORLD FRAME
+        """
+        if clear:
+            # Clearing the axes to show changes in landmarks
+            self.vis_axs[*fig_id].clear()
+
+        self.vis_axs[*fig_id].set_title("Keypoints and Landmarks")
+
+        # Camera pose and landmarks wrt world frame
+        landmarks_wrt_camera = ext_pose @ np.vstack((X, np.ones_like(X[0, :])))
+        landmarks_wrt_camera = landmarks_wrt_camera[:3, :]
+
+        # assert np.all(~(landmarks_wrt_camera[2, :] < 0)), "Landmarks for plotting wrt camera frame cannot be behind the camera"
+
+        kp_scaled = PlotUtils._convert_pixels_to_world(P, ext_pose)
+        PlotUtils._plot_keypoints_and_landmarks(self.vis_axs[*fig_id], ext_pose, kp_scaled, landmarks_wrt_camera, candidates)
 
     def _filter_lost_candidate_keypoints(self, curr_image: MatLike, prev_image: MatLike, prev_state: State) -> Tuple[State.Keypoints, State.Keypoints, State.PoseVectors]:
         """
@@ -97,7 +118,7 @@ class LandmarkTriangulation(BaseClass):
         unique_F = all_F[:, idx]
         unique_Tau = all_Tau[:, idx]
         self._info_print(f"After deduping, {unique_candidates.shape[1]} candidate keypoints selected to track")
-        self.viz_kp_difference((1, 1), unique_candidates, carried_over_candidates, diff_color="green", diff_label="New KPs", ss_color="purple", ss_label="Carried Over KPs")
+        self.viz_kp_difference((0, 1), unique_candidates, carried_over_candidates, diff_color="green", diff_label="New KPs", ss_color="purple", ss_label="Carried Over KPs")
 
         return unique_candidates, unique_F, unique_Tau
 
@@ -142,71 +163,72 @@ class LandmarkTriangulation(BaseClass):
     def _get_extrinsic_from_pose(T: NDArray):
         R = T[:3, :3]
         t = T[:3, 3][:, None]
-
         return R, t
 
-    def _triangulate_points(self, K, first_kp: State.Keypoints, first_pose: Pose, curr_kp: State.Keypoints, R_currCam_wrt_world: NDArray, t_currCam_wrt_world: NDArray, proj_mat_curr: NDArray) -> Tuple[bool, NDArray, float]:
-        # Triangulate points
-        R_firstCam_wrt_world, t_firstCam_wrt_world = self._get_extrinsic_from_pose(first_pose)
-        proj_mat_first = K @ np.block([R_firstCam_wrt_world, t_firstCam_wrt_world])
+    def _get_landmarks_for_keypoints(self, K: NDArray, C: State.Keypoints, F: State.Keypoints, Tau: State.PoseVectors, curr_pose: Pose) -> Tuple[State.Keypoints, State.Landmarks, State.Keypoints, State.Keypoints, State.PoseVectors]:
+        """
+        For the candidate keypoints, find out the landmarks that meet the threshold for getting added to the main queue,
 
-        pX_C_4D_wrt_first = cv2.triangulatePoints(proj_mat_first, proj_mat_curr, first_kp.T, curr_kp.T)
-        pX_C_wrt_first = pX_C_4D_wrt_first[:3, :] / pX_C_4D_wrt_first[3, :] # This is in the world frame.
-
-        # Convert point to camera frame (vector from center of the camera to the point).
-        # If the z axis is negative, the point is behind the camera and thus, has to be rejected
-        pX_C_wrt_world: NDArray = R_firstCam_wrt_world.T @ pX_C_wrt_first - R_firstCam_wrt_world.T @ t_firstCam_wrt_world
-        pX_C_wrt_camCurr: NDArray = R_currCam_wrt_world @ pX_C_wrt_world + t_currCam_wrt_world
-        pX_C_wrt_camFirst: NDArray = pX_C_wrt_first
-
-        if pX_C_wrt_camCurr[2] < 0 or pX_C_wrt_camFirst[2] < 0:
-            self._debug_print(f"Projection behind the camera - z1: {pX_C_wrt_camCurr[2] < 0} z2: {pX_C_wrt_camFirst[2] < 0}")
-            return False, np.zeros(3), 0.0
-
-        alpha = np.acos(pX_C_wrt_camFirst.T.dot(-pX_C_wrt_camCurr) / (np.linalg.norm(pX_C_wrt_camCurr) * np.linalg.norm(pX_C_wrt_camCurr)))
-
-        return True, pX_C_wrt_first, alpha
-
-    def _get_new_landmarks(self, K: NDArray, C_new: State.Keypoints, F_new: State.Keypoints, Tau_new: State.PoseVectors, curr_pose: Pose):
+        @return: P_new, X_new, C_remaining, F_remaining, Tau_remaining
+        """
         curr_R_ext, curr_t_ext = self._get_extrinsic_from_pose(curr_pose)
-        proj_mat_curr = K @ np.block([curr_R_ext, curr_t_ext])
-        points = []
-        angles = []
-        for c, f, tau in zip(C_new.T, F_new.T, Tau_new.T):
-            tau = tau.reshape((4, 4))
-            success, point, alpha = self._triangulate_points(K, f, tau, c, curr_R_ext, curr_t_ext, proj_mat_curr)
-            if not success:
+        proj_mat_curr: NDArray = K @ np.block([curr_R_ext, curr_t_ext])
+        points_world = np.zeros((3, C.shape[1]))
+        angles = np.zeros(C.shape[1])
+
+        for cnt, (c, f, tau) in enumerate(zip(C.T, F.T, Tau.T)):
+            tau: NDArray = tau.reshape((4, 4))
+            proj_mat_f: NDArray = K @ tau[:3, :]
+
+            pX_C_wrt_w_4D: NDArray = cv2.triangulatePoints(proj_mat_f, proj_mat_curr, f, c)
+            pX_C_wrt_w = pX_C_wrt_w_4D[:3, :] / pX_C_wrt_w_4D[3, :]
+            pX_C_wrt_f = tau @ np.vstack((pX_C_wrt_w, np.ones(1)))
+            pX_C_wrt_c = curr_pose @ np.vstack((pX_C_wrt_w, np.ones(1)))
+
+            # Possible improvement: Reproject and reject to clean up further
+            if pX_C_wrt_f[2] < 0 or pX_C_wrt_c[2] < 0:
+                self._debug_print(f"Rejecting landmark since it's triangulated behind the camera: f: {pX_C_wrt_f[2] < 0} c: {pX_C_wrt_c[2] < 0}")
                 continue
-            points.append(point)
-            angles.append(alpha)
 
-        angles = np.array(angles).ravel()
-        angles = angles[~np.isnan(angles)]
+            alpha = np.arccos(pX_C_wrt_c.T @ pX_C_wrt_f / (np.linalg.norm(pX_C_wrt_c) * np.linalg.norm(pX_C_wrt_f)))
+            if np.isnan(alpha):
+                continue
+            angles[cnt] = alpha
+            points_world[:, cnt] = pX_C_wrt_w.ravel()
 
-        print(f"Max Angle: {np.max(angles)} Min Angle: {np.min(angles)}")
+        self._plot_keypoints_and_landmarks((1, 1), curr_pose, C, points_world, candidates=True, clear=False)
 
-        # IDEA:
-        # if alpha > threshold:
-        #     pop C and X_C into P and X
+        eligible_keypoint_mask = angles > self.params['landmarkAngleThreshold']
+
+        P_new = C[:, eligible_keypoint_mask]
+        X_new = points_world[:, eligible_keypoint_mask]
+        C_remain = C[:, ~eligible_keypoint_mask]
+        F_remain = F[:, ~eligible_keypoint_mask]
+        Tau_remain = Tau[:, ~eligible_keypoint_mask]
+
+        self._info_print(f"Found {np.sum(eligible_keypoint_mask)} new landmarks to add to the queue. {np.sum(~eligible_keypoint_mask)} candidates remain.")
+
+        return P_new, X_new, C_remain, F_remain, Tau_remain
+
 
     def perform_triangulation(self, K: NDArray, curr_image: MatLike, prev_image: MatLike, prev_state: State, curr_pose: Pose):
 
         # Filter Lost Candidates First
-        self.viz_image((1, 0), curr_image, cmap="gray", label="Current Image", title="Lost KPs")
+        self.viz_image((0, 0), curr_image, cmap="gray", label="Current Image", title="Lost KPs")
         self._debug_print(f"Prev state number of candidates: {prev_state.C.shape[1]}")
-        C_remaining, F_remaining, Tau_remaining = self._filter_lost_candidate_keypoints(curr_image, prev_image, prev_state)
+        C_filtered, F_filtered, Tau_filtered = self._filter_lost_candidate_keypoints(curr_image, prev_image, prev_state)
 
         # Triangulate the points from the current candidates and evaluate the ones to Remove
-        self._get_new_landmarks(K, C_remaining, F_remaining, Tau_remaining, curr_pose)
+        P_new, X_new, C_remain, F_remain, Tau_remain = self._get_landmarks_for_keypoints(K, C_filtered, F_filtered, Tau_filtered, curr_pose)
 
         # Get new candidates from the current and previous frame
-        self.viz_image((1, 1), curr_image, cmap="gray", label="Current Image", title="Evaluated Candidates")
+        self.viz_image((0, 1), curr_image, cmap="gray", label="Current Image", title="Evaluated Candidates")
         new_candidates = self._provide_new_candidate_keypoints(curr_image, prev_image)
-        C_new, F_new, Tau_new = self._remove_duplicate_candidates_and_add_F_and_Tau(C_remaining, new_candidates, F_remaining, Tau_remaining, curr_pose)
+        C_new, F_new, Tau_new = self._remove_duplicate_candidates_and_add_F_and_Tau(C_remain, new_candidates, F_remain, Tau_remain, curr_pose)
 
-        return C_new, F_new, Tau_new
+        return P_new, X_new, C_new, F_new, Tau_new
 
-    def __call__(self, K: NDArray, curr_image: MatLike, prev_image: MatLike, prev_state: State, curr_pose: Pose):
+    def __call__(self, K: NDArray, curr_image: MatLike, prev_image: MatLike, updated_state: State, prev_state: State, curr_pose: Pose) -> State:
         """
         There are three steps here:
             1. Find which candidate keypoints are still there in the new image.
@@ -215,23 +237,23 @@ class LandmarkTriangulation(BaseClass):
             3.
         """
         self._clear_figures()
-        self.viz_curr_and_prev_img(curr_image, prev_image)
+        # self.viz_curr_and_prev_img(curr_image, prev_image)
 
-        state = deepcopy(prev_state)
+        self._plot_keypoints_and_landmarks((1, 1), curr_pose, updated_state.P, updated_state.X, candidates=False, clear=True)
 
+        P_new, X_new, C_new, F_new, Tau_new = self.perform_triangulation(K, curr_image, prev_image, prev_state, curr_pose)
 
-        # C_new, F_new, Tau_new = self._track_candidates(curr_image, prev_image, prev_state, curr_pose)
-        C_new, F_new, Tau_new = self.perform_triangulation(K, curr_image, prev_image, prev_state, curr_pose)
+        updated_state.P = np.hstack((updated_state.P, P_new))
+        updated_state.X = np.hstack((updated_state.X, X_new))
+        updated_state.C = C_new
+        updated_state.F = F_new
+        updated_state.Tau = Tau_new
 
         self._refresh_figures()
 
-        # Figure out what to return from here...
-        state.C = C_new
-        state.F = F_new
-        state.Tau = Tau_new
         self.iter += 1
 
-        return state
+        return updated_state
 
     @checkIter
     def get_axs(self, *args, **kwargs):

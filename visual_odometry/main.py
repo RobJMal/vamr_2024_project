@@ -15,6 +15,7 @@ from visual_odometry.common import BaseClass
 from visual_odometry.common.enums import LogLevel
 from visual_odometry.common.enums import DataSet
 from visual_odometry.common import State
+from visual_odometry.common.plot_utils import PlotUtils
 from visual_odometry.common.state import Pose
 from visual_odometry.initialization import Initialization
 from visual_odometry.keypoint_tracking import KeypointTracker
@@ -169,23 +170,18 @@ class VisualOdometryPipeline(BaseClass):
     def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int) -> Tuple[State, NDArray]:
         # From the previous image and previous state containing keypoints and landmarks,
         # figure out which keypoints carried over in the new image and return that set of P and X
-        state = self.keypoint_tracker(prev_state, prev_image, curr_image)
+        updated_state = self.keypoint_tracker(prev_state, prev_image, curr_image)
 
         # calling the pose estimator
-        pose = PoseEstimator.cvt_rot_trans_to_pose(*self.pose_estimator(state, self.K))
+        pose = PoseEstimator.cvt_rot_trans_to_pose(*self.pose_estimator(updated_state, self.K))
 
         self._plot_trajectory((0, 0), pose)
-        self._plot_trajectory_and_landmarks((0, 1), pose, state)
+        self._plot_trajectory_and_landmarks((0, 1), pose, updated_state)
 
         # Find and triangulate new landmarks
-        # WIP
-        n_state = self.landmark_triangulation(self.K, curr_image, prev_image, prev_state, pose)
+        updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
 
-        state.C = n_state.C
-        state.F = n_state.F
-        state.Tau = n_state.Tau
-
-        return state, pose
+        return updated_state, pose
 
     @BaseClass.plot_debug
     def _init_figures(self):
@@ -220,23 +216,17 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
+    @BaseClass.plot_debug
     def _plot_trajectory_and_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State):
         """
-        Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera 
-        is moving on a flat plane. 
+        Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera
+        is moving on a flat plane.
         """
         # Clearing the axes to show changes in landmarks
         self.vis_axs[*fig_id].clear()
 
-        # Camera pose and landmarks wrt world frame
-        camera_t_wrt_world = pose[:3, 3]
-        landmarks_wrt_world = state.X
-
         self.vis_axs[*fig_id].set_title("Trajectory and Landmarks")
-        self.vis_axs[*fig_id].scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
-        self.vis_axs[*fig_id].scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='black', s=10)
-        self.vis_axs[*fig_id].set_xlabel("X position")
-        self.vis_axs[*fig_id].set_ylabel("Z position")
+        PlotUtils._plot_trajectory_and_landmarks(self.vis_axs[*fig_id], pose, state)
 
     def run(self, dataset: DataSet = DataSet.KITTI, use_bootstrap: bool = True):
         self._info_print(f"Running pipeline for dataset: {dataset.name}, bootstrap: {use_bootstrap}")
@@ -248,8 +238,6 @@ class VisualOdometryPipeline(BaseClass):
         ### Continuous Operation ###
         for frame_id in image_range:
             self._info_print(f"Processing frame {frame_id}")
-
-            # self._clear_figures()
 
             match dataset:
                 case DataSet.KITTI:
