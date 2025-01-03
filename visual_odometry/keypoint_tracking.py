@@ -86,7 +86,7 @@ class KeypointTracker(BaseClass):
                              P_old_matching = P_old_matching.T, # old points that are matched within the new frame
                              P_new = P_new_matching.T, # new points that are matched with the old frame
                              )  
-        self._debug_print(f"Tracking {P_new_matching.shape[0]} keypoints, discarded by KLT: {np.sum(status == 0)}, \
+        self._info_print(f"Tracking {P_new_matching.shape[0]} keypoints, discarded by KLT: {np.sum(status == 0)}, \
                             discarded by RANSAC: {np.sum(inliers == 0)}")
 
         return state

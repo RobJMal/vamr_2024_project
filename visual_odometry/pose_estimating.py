@@ -1,3 +1,4 @@
+from typing import Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
@@ -37,7 +38,7 @@ class PoseEstimator(BaseClass):
             ])
 
 
-    def __call__(self, state: State, K_matrix: np.ndarray):
+    def __call__(self, state: State, K_matrix: np.ndarray) -> Tuple[bool, NDArray, NDArray]:
         """
         Main method for pose estimation.
 
@@ -59,11 +60,13 @@ class PoseEstimator(BaseClass):
         rot_matrix_wrt_world = rot_matrix_wrt_camera.T
         trans_vec_wrt_world = -rot_matrix_wrt_world @ trans_vec_wrt_camera
 
+        success = True
         if ret_val:
             self._debug_print(f"Rotation Matrix (wrt world frame): {rot_matrix_wrt_world}")
             self._debug_print(f"Translation Vector (wrt to world frame): {trans_vec_wrt_world}")
             self._debug_print(f"Inliers: {inliers}")
         else:
-            self._debug_print("Pose estimation failed.")
+            success = False
+            self._info_print("Pose estimation failed.")
 
-        return rot_matrix_wrt_world, trans_vec_wrt_world
+        return success, rot_matrix_wrt_world, trans_vec_wrt_world

@@ -34,6 +34,9 @@ class LandmarkTriangulation(BaseClass):
 
         # Retreive params
         self.params = param_server["landmark_triangulation"]
+        self.num_kp: int = self.params['maxNewKeypointsPerIter']
+        self.apply_win_thresholding: bool = self.params['applyWindowThresholding']
+        self.landmark_angle_threshold = self.params["landmarkAngleThreshold"]
 
     @BaseClass.plot_debug
     def _init_figures(self):
@@ -140,7 +143,7 @@ class LandmarkTriangulation(BaseClass):
         all_candidates = np.hstack((carried_over_candidates, new_candidates))
         all_F = np.hstack((F, new_F))
         all_Tau = np.hstack((Tau, new_Tau))
-        self._info_print(
+        self._debug_print(
             f"Combining old and new candidates to get: {all_candidates.shape[1]}"
         )
 
@@ -149,7 +152,7 @@ class LandmarkTriangulation(BaseClass):
         unique_candidates = all_candidates[:, idx]
         unique_F = all_F[:, idx]
         unique_Tau = all_Tau[:, idx]
-        self._info_print(
+        self._debug_print(
             f"After deduping, {unique_candidates.shape[1]} candidate keypoints selected to track"
         )
         self.viz_kp_difference(
@@ -178,8 +181,36 @@ class LandmarkTriangulation(BaseClass):
         new_candidates = np.array(
             [kp_curr_raw[m.queryIdx].pt for m in matches], dtype=np.float32
         ).T
+
         self._debug_print(f"Found: {new_candidates.shape[1]} new candidate keypoints")
+
+        if self.apply_win_thresholding:
+            return self._select_n_new_keypoints(curr_image.shape, new_candidates)
         return new_candidates
+
+    def _select_n_new_keypoints(self, img_size: Tuple[int, int], candidates: State.Keypoints):
+        if candidates.shape[1] <= self.num_kp:
+            return candidates
+
+        self._debug_print(f"Eligible new keypoints: {candidates.shape}")
+
+        num_wins = int(np.sqrt(self.num_kp))
+        x_bins = np.linspace(0, img_size[0], num_wins+1)
+        y_bins = np.linspace(0, img_size[1], num_wins+1)
+
+        # Associate each keypoint with a window ID
+        # windows = np.zeros((1, candidates.shape[1]))
+
+        # naively:
+        x_id = np.digitize(candidates, x_bins) - 1
+        y_id = np.digitize(candidates, y_bins) - 1
+
+        _, idx = np.unique(np.vstack((x_id, y_id)), axis=1, return_index=True)
+
+        candidates = candidates[:, idx]
+        self._debug_print(f"After windowing, new keypoints: {candidates.shape}")
+        return candidates
+
 
     @staticmethod
     def _inv_homo_transform(T):
@@ -250,13 +281,15 @@ class LandmarkTriangulation(BaseClass):
             (1, 1), curr_pose, C, points_world, candidates=True, clear=False
         )
 
-        eligible_keypoint_mask = angles > self.params["landmarkAngleThreshold"]
+        eligible_keypoint_mask = angles > self.landmark_angle_threshold
 
         P_new = C[:, eligible_keypoint_mask]
         X_new = points_world[:, eligible_keypoint_mask]
+
         C_remain = C[:, ~eligible_keypoint_mask]
         F_remain = F[:, ~eligible_keypoint_mask]
         Tau_remain = Tau[:, ~eligible_keypoint_mask]
+
 
         self._info_print(
             f"Found {np.sum(eligible_keypoint_mask)} new landmarks to add to the queue. {np.sum(~eligible_keypoint_mask)} candidates remain."

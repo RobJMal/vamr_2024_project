@@ -25,4 +25,6 @@ landmark_triangulation:
   # min_inliers: 10 # minimum number of inliers to track
   criteria_eps: 0.01 # treshold for the Lucas-Kanade tracker
   criteria_count: 10 # number of iterations for the Lucas-Kanade tracker
-  landmarkAngleThreshold: 1.04 # radians # 60 degrees
+  landmarkAngleThreshold: 0.1 # radians # 30 degrees
+  maxNewKeypointsPerIter: 200 # Create n windows and select one point from this. Must be a square number since we use windowing to achieve this
+  applyWindowThresholding: false
