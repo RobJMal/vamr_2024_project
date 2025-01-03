@@ -43,8 +43,8 @@ class PlotUtils:
         camera_t_wrt_world = pose[:3, 3]
         landmarks_wrt_world = state.X
 
-        axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
-        axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='black', s=10)
+        axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10, label="Current Landmarks")
+        axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10, label="Current Camera Pose")
         axs.set_xlabel("X position")
         axs.set_ylabel("Z position")
 
