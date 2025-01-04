@@ -37,6 +37,8 @@ class LandmarkTriangulation(BaseClass):
         self.num_kp: int = self.params['maxNewKeypointsPerIter']
         self.apply_win_thresholding: bool = self.params['applyWindowThresholding']
         self.landmark_angle_threshold = self.params["landmarkAngleThreshold"]
+        self.reprojection_error_threshold = self.params["reprojectionErrorThreshold"]
+        self.apply_reprojection_error_rejection = self.params["applyReprojectionErrorRejection"]
 
     @BaseClass.plot_debug
     def _init_figures(self):
@@ -120,7 +122,7 @@ class LandmarkTriangulation(BaseClass):
         Tau_remaining = prev_state.Tau[:, status.ravel() == 1]
 
         self.viz_kp_difference(
-            (1, 0),
+            (0, 1),
             C_remaining,
             prev_state.C,
             diff_color="red",
@@ -156,7 +158,7 @@ class LandmarkTriangulation(BaseClass):
             f"After deduping, {unique_candidates.shape[1]} candidate keypoints selected to track"
         )
         self.viz_kp_difference(
-            (0, 1),
+            (0, 0),
             unique_candidates,
             carried_over_candidates,
             diff_color="green",
@@ -225,6 +227,22 @@ class LandmarkTriangulation(BaseClass):
         t = T[:3, 3][:, None]
         return R, t
 
+    def _get_reprojection_error_mask(self, C, proj_mat, X) -> NDArray:
+        """
+        Return a boolean mask of selected landmarks to reject
+        """
+        if not self.apply_reprojection_error_rejection:
+            return np.ones(C.shape[1], dtype=np.bool)
+        reprojected = proj_mat @ np.vstack((X, np.ones(X.shape[1])))
+        reprojected = reprojected[:2, :] / reprojected[2, :]
+        error = np.linalg.norm(reprojected - C, axis=0)
+
+        mask = error < self.reprojection_error_threshold
+        self._debug_print(f"Reprojection Error Mask Rejects: {np.sum(~mask)}/{mask.shape[0]} keypoints")
+
+        self._plot_reproj_error_summary((1, 0), error, mask)
+        return mask
+
     def _get_landmarks_for_keypoints(
         self,
         K: NDArray,
@@ -282,13 +300,16 @@ class LandmarkTriangulation(BaseClass):
         )
 
         eligible_keypoint_mask = angles > self.landmark_angle_threshold
+        reprojection_error_mask = self._get_reprojection_error_mask(C, proj_mat_curr, points_world)
 
-        P_new = C[:, eligible_keypoint_mask]
-        X_new = points_world[:, eligible_keypoint_mask]
+        selection_mask = eligible_keypoint_mask & reprojection_error_mask
 
-        C_remain = C[:, ~eligible_keypoint_mask]
-        F_remain = F[:, ~eligible_keypoint_mask]
-        Tau_remain = Tau[:, ~eligible_keypoint_mask]
+        P_new = C[:, selection_mask]
+        X_new = points_world[:, selection_mask]
+
+        C_remain = C[:, ~selection_mask]
+        F_remain = F[:, ~selection_mask]
+        Tau_remain = Tau[:, ~selection_mask]
 
 
         self._info_print(
@@ -296,6 +317,14 @@ class LandmarkTriangulation(BaseClass):
         )
 
         return P_new, X_new, C_remain, F_remain, Tau_remain
+
+    @BaseClass.plot_debug
+    def _plot_reproj_error_summary(self, fig_id: Tuple[int, int], error, mask):
+        x_ax = np.arange(error.shape[0])
+        self.vis_axs[*fig_id].scatter(x_ax[mask], error[mask], color="Green", label=f"Accepted: {np.sum(mask)}", alpha=0.1)
+        self.vis_axs[*fig_id].scatter(x_ax[~mask], error[~mask], color="Red", label=f"Rejected: {np.sum(~mask)}", alpha=0.1)
+        self.vis_axs[*fig_id].set_title("Reprojection Error")
+
 
     def perform_triangulation(
         self,
@@ -307,9 +336,6 @@ class LandmarkTriangulation(BaseClass):
     ):
 
         # Filter Lost Candidates First
-        self.viz_image(
-            (0, 0), curr_image, cmap="gray", label="Current Image", title="Lost KPs"
-        )
         self._debug_print(f"Prev state number of candidates: {prev_state.C.shape[1]}")
         C_filtered, F_filtered, Tau_filtered = self._filter_lost_candidate_keypoints(
             curr_image, prev_image, prev_state
@@ -324,7 +350,7 @@ class LandmarkTriangulation(BaseClass):
 
         # Get new candidates from the current and previous frame
         self.viz_image(
-            (0, 1),
+            (0, 0),
             curr_image,
             cmap="gray",
             label="Current Image",

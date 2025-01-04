@@ -40,6 +40,20 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "Run Pipeline - PARKING, Debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/visual_odometry/main.py",
+            "args": [
+                "--dataset",
+                "PARKING",
+                "--debug",
+                "DEBUG"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

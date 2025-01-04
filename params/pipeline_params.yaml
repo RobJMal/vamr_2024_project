@@ -28,3 +28,5 @@ landmark_triangulation:
   landmarkAngleThreshold: 0.1 # radians # 30 degrees
   maxNewKeypointsPerIter: 200 # Create n windows and select one point from this. Must be a square number since we use windowing to achieve this
   applyWindowThresholding: false
+  reprojectionErrorThreshold: 3 # pixel distance
+  applyReprojectionErrorRejection: true
