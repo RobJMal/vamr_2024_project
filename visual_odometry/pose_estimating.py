@@ -54,6 +54,8 @@ class PoseEstimator(BaseClass):
         ret_val, rot_vec_wrt_camera, trans_vec_wrt_camera, inliers = cv2.solvePnPRansac(state.X.T, state.P.T, K_matrix,            
                                                                   distCoeffs=distortion_matrix, 
                                                                   useExtrinsicGuess=self.params["use_extrinsic_guess"],
+                                                                  iterationsCount=self.params["pnp_ransac_iterations"],
+                                                                  reprojectionError=self.params["pnp_ransac_reprojection_error"],
                                                                   confidence=self.params["pnp_ransac_confidence"])
         
         if self.params["use_reprojection_error_optimization"]:
