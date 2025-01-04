@@ -82,7 +82,7 @@ class PlotUtils:
         """
         average_car_width = 2 # meters
         kp_X_scaled = (keypoints[0, :] - np.min(keypoints[0, :]))/(np.max(keypoints[0, :]) - np.min(keypoints[0, :])) * average_car_width
-        kp_X_scaled = kp_X_scaled + pose[0, 3] - (average_car_width/2) # Centers it to the current pose
+        kp_X_scaled = kp_X_scaled - (average_car_width/2) # Centers it to the current pose
         return np.vstack((kp_X_scaled, np.zeros_like(kp_X_scaled)))
 
 
@@ -97,9 +97,9 @@ class PlotUtils:
         kp_color = "purple" if candidates else "blue"
         landmark_color = "orange" if candidates else "green"
 
-        axs.scatter(pose[0, 3], 0, color='red', s=20, label="Curr X")
-        axs.scatter(keypoints_scaled[0, :], np.zeros_like(keypoints_scaled[0, :]), color=kp_color, s=10, label=f"Keypoints {'candidates' if candidates else ''}", alpha=0.3)
-        axs.scatter(landmarks_wrt_camera[0, :], landmarks_wrt_camera[2, :], color=landmark_color, s=10, label=f"Landmarks {'candidates' if candidates else ''}", alpha=0.3)
+        # axs.scatter(pose[0, 3], 0, color='red', s=20, label="Curr X")
+        axs.scatter(keypoints_scaled[0, :], np.zeros_like(keypoints_scaled[0, :]), color=kp_color, s=10, label=f"Keypoints {'candidates' if candidates else ''}: {keypoints_scaled.shape[1]}", alpha=0.3)
+        axs.scatter(landmarks_wrt_camera[0, :], landmarks_wrt_camera[2, :], color=landmark_color, s=10, label=f"Landmarks {'candidates' if candidates else ''}: {landmarks_wrt_camera.shape[1]}", alpha=0.3)
 
         axs.set_xlabel("X position")
         axs.set_ylabel("Z position")

@@ -170,7 +170,7 @@ class VisualOdometryPipeline(BaseClass):
     def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int) -> State:
         # From the previous image and previous state containing keypoints and landmarks,
         # figure out which keypoints carried over in the new image and return that set of P and X
-        updated_state = self.keypoint_tracker(prev_state, prev_image, curr_image)
+        updated_state = self.keypoint_tracker(self.K, prev_state, prev_image, curr_image)
 
         # calling the pose estimator
         pose_success, R, t = self.pose_estimator(updated_state, self.K)
