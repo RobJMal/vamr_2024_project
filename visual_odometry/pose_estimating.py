@@ -51,10 +51,16 @@ class PoseEstimator(BaseClass):
         distortion_matrix = np.zeros((1,5))
 
         # Transposing since cv2 inverts rows and cols representation
-        ret_val, rot_vec_wrt_camera, trans_vec_wrt_camera, inliers = cv2.solvePnPRansac(state.X.T, state.P.T, K_matrix, 
-                                                                  useExtrinsicGuess=False,
+        ret_val, rot_vec_wrt_camera, trans_vec_wrt_camera, inliers = cv2.solvePnPRansac(state.X.T, state.P.T, K_matrix,            
                                                                   distCoeffs=distortion_matrix, 
-                                                                  confidence=0.999)
+                                                                  useExtrinsicGuess=self.params["use_extrinsic_guess"],
+                                                                  confidence=self.params["pnp_ransac_confidence"])
+        
+        if self.params["use_reprojection_error_optimization"]:
+            rot_matrix_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(state.X.T, state.P.T, K_matrix, 
+                                                                               distCoeffs=distortion_matrix, 
+                                                                               rvec=rot_vec_wrt_camera, tvec=trans_vec_wrt_camera)
+
         rot_matrix_wrt_camera, _ = cv2.Rodrigues(rot_vec_wrt_camera)
 
         rot_matrix_wrt_world = rot_matrix_wrt_camera.T
