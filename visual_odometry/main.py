@@ -179,10 +179,7 @@ class VisualOdometryPipeline(BaseClass):
 
             # Find and triangulate new landmarks
             updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
-
-            self._plot_trajectory((0, 0), pose, frame_id)
-            self._plot_trajectory_and_landmarks((0, 1), pose, updated_state, frame_id)
-            self._plot_landmarks((1, 1), pose, updated_state, frame_id)
+            self._plot_vo_vis_main(pose, updated_state, frame_id)
 
         return updated_state
 
@@ -203,22 +200,14 @@ class VisualOdometryPipeline(BaseClass):
             ax.legend()
         plt.pause(.1)
 
-    def _plot_trajectory(self, fig_id: Tuple[int, int], pose: Pose, frame_id: int = 0):
+    def _plot_full_trajectory(self, fig_id: Tuple[int, int], pose: Pose, frame_id: int = 0):
         """
         Plots the trajectory of the camera wrt the world frame. Plots only the x and z coordinates since the camera
         is moving on a flat plane.
         """
         # Camera pose wrt world frame
-        camera_t_wrt_world = pose[:3, 3]
-
-        self.vis_axs[*fig_id].set_title("Trajectory")
-        if frame_id == 0:
-            self.vis_axs[*fig_id].scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10, label="Camera Pose")
-            self.vis_axs[*fig_id].scatter(self.ground_truth.T[0][frame_id], self.ground_truth.T[1][frame_id], color='blue', s=10, label="Ground Truth")
-        else:
-            self.vis_axs[*fig_id].scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10)
-            self.vis_axs[*fig_id].scatter(self.ground_truth.T[0][frame_id], self.ground_truth.T[1][frame_id], color='blue', s=10)
-        
+        self.vis_axs[*fig_id].set_title("Full Trajectory")
+        PlotUtils._plot_trajectory(self.vis_axs[*fig_id], pose, frame_id, plot_ground_truth=True, ground_truth=self.ground_truth)
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
@@ -231,36 +220,27 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].clear()
 
         self.vis_axs[*fig_id].set_title("Trajectory and Landmarks")
-        PlotUtils._plot_trajectory_and_landmarks(self.vis_axs[*fig_id], pose, state)
-        self.vis_axs[*fig_id].scatter(self.ground_truth.T[0][:frame_id+1], self.ground_truth.T[1][:frame_id+1], color='blue', s=10, label="Ground Truth Pose")
-
-    def _plot_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State, frame_id: int = 0):
-        """
-        Continuously plots the landmarks. Plots only the x and z coordinates since the camera
-        is moving on a flat plane.
-        """
-        camera_t_wrt_world = pose[:3, 3]
-        landmarks_wrt_world = state.X
-
-        self.vis_axs[*fig_id].set_title("Landmark History")
-        if frame_id == 0:
-            self.vis_axs[*fig_id].scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10, label="Pose History")
-            self.vis_axs[*fig_id].scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10, label="ALL Landmarks")
-        else:
-            self.vis_axs[*fig_id].scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
-            self.vis_axs[*fig_id].scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10)
-
+        PlotUtils._plot_trajectory(self.vis_axs[*fig_id], pose, frame_id, plot_ground_truth=False, ground_truth=self.ground_truth)
+        PlotUtils._plot_landmarks(self.vis_axs[*fig_id], pose, state, frame_id)
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
+
+    def _plot_vo_vis_main(self, pose: Pose, state: State, frame_id: int=0):
+        """
+        Plots all of the subplots in the main visualization.
+        """
+        self._plot_full_trajectory((0, 0), pose, frame_id)
+        self._plot_trajectory_and_landmarks((0, 1), pose, state, frame_id)
+        # self._plot_landmarks((1, 1), pose, state, frame_id)
+    
     # endregion
 
     def run(self, dataset: DataSet = DataSet.KITTI, use_bootstrap: bool = True):
         self._info_print(f"Running pipeline for dataset: {dataset.name}, bootstrap: {use_bootstrap}")
 
         state, image_range, prev_image = self._init_dataset(dataset, use_bootstrap)
-        self._plot_trajectory((0, 0), self.world_pose)
-        self._plot_trajectory_and_landmarks((0, 1), self.world_pose, state)
-        self._plot_landmarks((1, 1), self.world_pose, state)
+
+        self._plot_vo_vis_main(self.world_pose, state, frame_id = 0)
 
         ### Continuous Operation ###
         for frame_id in image_range:
