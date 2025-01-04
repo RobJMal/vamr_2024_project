@@ -186,26 +186,26 @@ class VisualOdometryPipeline(BaseClass):
 
         return updated_state
 
-    @BaseClass.plot_debug
+    # @BaseClass.plot_debug
     def _init_figures(self):
         self.vis_figure, self.vis_axs = plt.subplots(2, 2, figsize=(20, 10))
         self.vis_axs[0, 0].remove()
         self.vis_axs[0, 0] = self.vis_figure.add_subplot(2, 2, 1)
         self.vis_figure.suptitle("Visual Odometry Pipeline")
 
-    @BaseClass.plot_debug
+    # @BaseClass.plot_debug
     def _clear_figures(self):
         for ax in self.vis_axs.flat:
             ax.clear()
 
-    @BaseClass.plot_debug
+    # @BaseClass.plot_debug
     def _refresh_figures(self):
         self.vis_figure.canvas.draw_idle()
         for ax in self.vis_axs.flat:
             ax.legend()
         plt.pause(.1)
 
-    @BaseClass.plot_debug
+    # @BaseClass.plot_debug
     def _plot_trajectory(self, fig_id: Tuple[int, int], pose: Pose, frame_id: int = 0):
         """
         Plots the trajectory of the camera wrt the world frame. Plots only the x and z coordinates since the camera
@@ -226,7 +226,7 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
 
-    @BaseClass.plot_debug
+    # @BaseClass.plot_debug
     def _plot_trajectory_and_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State, frame_id: int = 0):
         """
         Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera
@@ -239,7 +239,7 @@ class VisualOdometryPipeline(BaseClass):
         PlotUtils._plot_trajectory_and_landmarks(self.vis_axs[*fig_id], pose, state)
         self.vis_axs[*fig_id].scatter(self.ground_truth.T[0][:frame_id+1], self.ground_truth.T[1][:frame_id+1], color='blue', s=10, label="Ground Truth Pose")
 
-    @BaseClass.plot_debug
+    # @BaseClass.plot_debug
     def _plot_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State, frame_id: int = 0):
         """
         Continuously plots the landmarks. Plots only the x and z coordinates since the camera
