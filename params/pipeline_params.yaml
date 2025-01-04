@@ -26,7 +26,7 @@ landmark_triangulation:
   criteria_eps: 0.01 # treshold for the Lucas-Kanade tracker
   criteria_count: 10 # number of iterations for the Lucas-Kanade tracker
   landmarkAngleThreshold: 0.1 # radians # 30 degrees
-  maxNewKeypointsPerIter: 200 # Create n windows and select one point from this. Must be a square number since we use windowing to achieve this
-  applyWindowThresholding: false
+  maxNewKeypointsPerIter: 100 # Create n windows and select one point from this. Must be a square number since we use windowing to achieve this
+  applyWindowThresholding: true
   reprojectionErrorThreshold: 3 # pixel distance
   applyReprojectionErrorRejection: true

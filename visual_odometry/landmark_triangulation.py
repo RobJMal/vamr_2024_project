@@ -116,10 +116,16 @@ class LandmarkTriangulation(BaseClass):
             ),
         )
 
-        # get the matching points
-        C_remaining = C_new[status == 1].T
+        # Use RANSAC to estimate essential matrix, E, to filter out outliers
+        C_remaining = C_new[status == 1]
         F_remaining = prev_state.F[:, status.ravel() == 1]
         Tau_remaining = prev_state.Tau[:, status.ravel() == 1]
+        
+        E, mask = cv2.findEssentialMat(C_prev[status == 1], C_remaining, self.K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
+
+        C_remaining = C_remaining[mask.ravel() == 1].T
+        F_remaining = F_remaining[:, mask.ravel() == 1]
+        Tau_remaining = Tau_remaining[:, mask.ravel() == 1]
 
         self.viz_kp_difference(
             (0, 1),
@@ -381,6 +387,7 @@ class LandmarkTriangulation(BaseClass):
         """
         self._clear_figures()
         # self.viz_curr_and_prev_img(curr_image, prev_image)
+        self.K = K
 
         self._plot_keypoints_and_landmarks(
             (1, 1),
