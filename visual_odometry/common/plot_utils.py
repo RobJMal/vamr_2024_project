@@ -33,20 +33,39 @@ class PlotUtils:
         axs.quiver(t[0], t[1], t[2], z_axis[0], z_axis[1], z_axis[2], color='b', length=scale)
 
     @staticmethod
-    def _plot_trajectory_and_landmarks(axs: Axes, pose: Pose, state: State):
+    def _plot_trajectory(axs: Axes, pose: Pose, frame_id: int = 0, plot_ground_truth: bool = False, ground_truth: NDArray = None):
         """
-        Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera
+        Plots the trajectory of the camera wrt the world frame. Plots only the x and z coordinates since the camera
         is moving on a flat plane.
-
         """
-        # Camera pose and landmarks wrt world frame
+        # Camera pose wrt world frame
+        camera_t_wrt_world = pose[:3, 3]
+
+        if frame_id == 0:
+            axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10, label="Camera Pose")
+
+            if plot_ground_truth:
+                axs.scatter(ground_truth.T[0][frame_id], ground_truth.T[1][frame_id], color='blue', s=10, label="Ground Truth")
+        else:
+            axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10)
+
+            if plot_ground_truth:
+                axs.scatter(ground_truth.T[0][frame_id], ground_truth.T[1][frame_id], color='blue', s=10)
+
+    @staticmethod
+    def _plot_landmarks(axs: Axes, pose: Pose, state: State, frame_id: int = 0):
+        """
+        Plots the landmarks. Plots only the x and z coordinates since the camera is moving on a flat plane.
+        """
         camera_t_wrt_world = pose[:3, 3]
         landmarks_wrt_world = state.X
 
-        axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10, label="Current Landmarks")
-        axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10, label="Current Camera Pose")
-        axs.set_xlabel("X position")
-        axs.set_ylabel("Z position")
+        if frame_id == 0:
+            axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10, label="Pose History")
+            axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10, label="ALL Landmarks")
+        else:
+            axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
+            axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10)
 
     @staticmethod
     def _convert_pixels_to_world(keypoints: State.Keypoints, pose: Pose) -> NDArray:
