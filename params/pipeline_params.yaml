@@ -16,7 +16,9 @@ keypoint_tracker:
 
 # module: pose_estimator
 pose_estimator:
-  param1: 0
+  use_extrinsic_guess: false
+  pnp_ransac_confidence: 0.999
+  use_reprojection_error_optimization: false
 
 landmark_triangulation:
   maxNumCandidateKeypoints: 100
