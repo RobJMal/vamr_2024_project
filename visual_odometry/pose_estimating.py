@@ -60,7 +60,7 @@ class PoseEstimator(BaseClass):
         
         if self.params["use_reprojection_error_optimization"]:
             rot_matrix_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(state.X.T, state.P.T, K_matrix, 
-                                                                               distCoeffs=distortion_matrix, 
+                                                                               distCoeffs=distortion_matrix,
                                                                                rvec=rot_vec_wrt_camera, tvec=trans_vec_wrt_camera)
 
         rot_matrix_wrt_camera, _ = cv2.Rodrigues(rot_vec_wrt_camera)

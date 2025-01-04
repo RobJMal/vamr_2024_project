@@ -287,9 +287,9 @@ class LandmarkTriangulation(BaseClass):
 
             # Possible improvement: Reproject and reject to clean up further
             if pX_C_wrt_f[2] < 0 or pX_C_wrt_c[2] < 0:
-                self._debug_print(
-                    f"Rejecting landmark since it's triangulated behind the camera: f: {pX_C_wrt_f[2] < 0} c: {pX_C_wrt_c[2] < 0}"
-                )
+                # self._debug_print(
+                #     f"Rejecting landmark since it's triangulated behind the camera: f: {pX_C_wrt_f[2] < 0} c: {pX_C_wrt_c[2] < 0}"
+                # )
                 continue
 
             alpha = np.arccos(
@@ -302,15 +302,25 @@ class LandmarkTriangulation(BaseClass):
             angles[cnt] = alpha
             points_world[:, cnt] = pX_C_wrt_w.ravel()
 
+        points_camera = curr_pose @ np.vstack((points_world, np.ones(points_world.shape[1])))
+        points_camera = points_camera[:3, :] / points_camera[3, :]
+
+        points_mask = self._remove_outlier_mask(X_curr, points_camera, np.ones(points_camera.shape[1], dtype=bool), axis=2, threshold=3.0)
+        points_mask = self._remove_outlier_mask(X_curr, points_camera, points_mask, axis=0, threshold=1.2)
+
+        self._debug_print(f"After removing outliers in the X and Z axis, we have {np.sum(points_mask)}/{points_world.shape[1]} landmarks available")
+
+        points_world[:, ~points_mask] = 0
+        angles[~points_mask] = 0
+
         self._plot_keypoints_and_landmarks(
-            (1, 1), curr_pose, C, points_world, candidates=True, clear=False
+                (1, 1), curr_pose, C, points_world[:, points_mask], candidates=True, clear=False
         )
 
         eligible_keypoint_mask = angles > self.landmark_angle_threshold
         reprojection_error_mask = self._get_reprojection_error_mask(C, proj_mat_curr, points_world)
 
         selection_mask = eligible_keypoint_mask & reprojection_error_mask
-        selection_mask = self._remove_outlier_mask(X_curr, points_world, selection_mask)
 
         P_new = C[:, selection_mask]
         X_new = points_world[:, selection_mask]
@@ -326,20 +336,24 @@ class LandmarkTriangulation(BaseClass):
 
         return P_new, X_new, C_remain, F_remain, Tau_remain
 
-    def _remove_outlier_mask(self, X_curr, X_new, mask):
+    def _remove_outlier_mask(self, X_curr, X_new, mask, axis, threshold):
         """
         Given the current selection of new landmarks, don't add ones that are a threshold pct away on the Z axis
         from the mean X_curr
         """
-        data = X_new[2, mask]
+        data = X_new[axis, mask]
         if data.size == 0:
             return mask
 
-        farthest_curr_X = np.mean(X_curr[2, :])
-        threshold: float = 3.0
+        farthest_curr_X = np.median(X_curr[axis, :])
         limit = threshold * farthest_curr_X
 
-        threshold_mask = data < limit
+        threshold_mask = np.abs(data) < limit
+
+        # STD DEV METHOD
+        # mean = np.mean(data)
+        # std_dev = np.std(data)
+        # threshold_mask = (data > (mean - (threshold * std_dev))) & (data < (mean + (threshold * std_dev)))
 
         updated_mask = np.zeros_like(mask, dtype=bool)
         updated_mask[mask] = threshold_mask
