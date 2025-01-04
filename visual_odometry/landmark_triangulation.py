@@ -120,8 +120,8 @@ class LandmarkTriangulation(BaseClass):
         C_remaining = C_new[status == 1]
         F_remaining = prev_state.F[:, status.ravel() == 1]
         Tau_remaining = prev_state.Tau[:, status.ravel() == 1]
-        
-        E, mask = cv2.findEssentialMat(C_prev[status == 1], C_remaining, self.K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
+
+        _, mask = cv2.findEssentialMat(C_prev[status == 1], C_remaining, self.K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
 
         C_remaining = C_remaining[mask.ravel() == 1].T
         F_remaining = F_remaining[:, mask.ravel() == 1]
@@ -252,6 +252,7 @@ class LandmarkTriangulation(BaseClass):
     def _get_landmarks_for_keypoints(
         self,
         K: NDArray,
+        X_curr: State.Landmarks,
         C: State.Keypoints,
         F: State.Keypoints,
         Tau: State.PoseVectors,
@@ -309,6 +310,7 @@ class LandmarkTriangulation(BaseClass):
         reprojection_error_mask = self._get_reprojection_error_mask(C, proj_mat_curr, points_world)
 
         selection_mask = eligible_keypoint_mask & reprojection_error_mask
+        selection_mask = self._remove_outlier_mask(X_curr, points_world, selection_mask)
 
         P_new = C[:, selection_mask]
         X_new = points_world[:, selection_mask]
@@ -323,6 +325,25 @@ class LandmarkTriangulation(BaseClass):
         )
 
         return P_new, X_new, C_remain, F_remain, Tau_remain
+
+    def _remove_outlier_mask(self, X_curr, X_new, mask):
+        """
+        Given the current selection of new landmarks, don't add ones that are a threshold pct away on the Z axis
+        from the mean X_curr
+        """
+        data = X_new[2, mask]
+        if data.size == 0:
+            return mask
+
+        farthest_curr_X = np.mean(X_curr[2, :])
+        threshold: float = 3.0
+        limit = threshold * farthest_curr_X
+
+        threshold_mask = data < limit
+
+        updated_mask = np.zeros_like(mask, dtype=bool)
+        updated_mask[mask] = threshold_mask
+        return updated_mask
 
     @BaseClass.plot_debug
     def _plot_reproj_error_summary(self, fig_id: Tuple[int, int], error, mask):
@@ -350,7 +371,7 @@ class LandmarkTriangulation(BaseClass):
         # Triangulate the points from the current candidates and evaluate the ones to Remove
         P_new, X_new, C_remain, F_remain, Tau_remain = (
             self._get_landmarks_for_keypoints(
-                K, C_filtered, F_filtered, Tau_filtered, curr_pose
+                K, prev_state.X, C_filtered, F_filtered, Tau_filtered, curr_pose
             )
         )
 
