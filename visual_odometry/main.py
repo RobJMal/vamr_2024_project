@@ -225,12 +225,34 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
+    def _plot_keypoint_tracking_count(self, fig_id: Tuple[int, int], state: State, frame_id: int = 0):
+        """
+        Plots the number of keypoints tracked in each frame.
+        """
+        # Maintain history of frames and keypoint counts. This is 
+        # enable us to plot the history of keypoints tracked as a line
+        if not hasattr(self, 'keypoint_history'):
+            self.keypoint_history = {'frames': [], 'keypoints': []}
+
+        # Append current frame and keypoint count to the history. 
+        self.keypoint_history['frames'].append(frame_id)
+        self.keypoint_history['keypoints'].append(state.P.shape[1])
+
+        # Clear the axis for fresh plotting
+        self.vis_axs[*fig_id].clear()
+
+        self.vis_axs[*fig_id].set_title("Keypoint Tracking Count")
+        self.vis_axs[*fig_id].plot(self.keypoint_history['frames'], self.keypoint_history['keypoints'], marker='o')
+        self.vis_axs[*fig_id].set_xlabel("Frame")
+        self.vis_axs[*fig_id].set_ylabel("Number of keypoints")
+
     def _plot_vo_vis_main(self, pose: Pose, state: State, frame_id: int=0):
         """
         Plots all of the subplots in the main visualization.
         """
         self._plot_full_trajectory((0, 0), pose, frame_id)
         self._plot_trajectory_and_landmarks((0, 1), pose, state, frame_id)
+        self._plot_keypoint_tracking_count((1, 0), state, frame_id)
         # self._plot_landmarks((1, 1), pose, state, frame_id)
     
     # endregion
