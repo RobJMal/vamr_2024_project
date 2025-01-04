@@ -167,22 +167,24 @@ class VisualOdometryPipeline(BaseClass):
                 "No keypoints provided for initialization for dataset other than KITTI")
         return self._get_kitti_debug_points()
 
-    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int) -> Tuple[State, NDArray]:
+    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int) -> State:
         # From the previous image and previous state containing keypoints and landmarks,
         # figure out which keypoints carried over in the new image and return that set of P and X
         updated_state = self.keypoint_tracker(prev_state, prev_image, curr_image)
 
         # calling the pose estimator
-        pose = PoseEstimator.cvt_rot_trans_to_pose(*self.pose_estimator(updated_state, self.K))
+        pose_success, R, t = self.pose_estimator(updated_state, self.K)
+        if pose_success:
+            pose = PoseEstimator.cvt_rot_trans_to_pose(R, t)
 
-        # Find and triangulate new landmarks
-        updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
+            # Find and triangulate new landmarks
+            updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
 
-        self._plot_trajectory((0, 0), pose, frame_id)
-        self._plot_trajectory_and_landmarks((0, 1), pose, updated_state, frame_id)
-        self._plot_landmarks((1, 1), pose, updated_state, frame_id)
+            self._plot_trajectory((0, 0), pose, frame_id)
+            self._plot_trajectory_and_landmarks((0, 1), pose, updated_state, frame_id)
+            self._plot_landmarks((1, 1), pose, updated_state, frame_id)
 
-        return updated_state, pose
+        return updated_state
 
     @BaseClass.plot_debug
     def _init_figures(self):
@@ -283,7 +285,7 @@ class VisualOdometryPipeline(BaseClass):
                     image = np.array(cv2.imread(image_path, cv2.IMREAD_GRAYSCALE))
                     image = cv2.convertScaleAbs(image)
 
-            new_state, pose = self._process_frame(image, prev_image, state, frame_id)
+            new_state = self._process_frame(image, prev_image, state, frame_id)
 
             # Makes sure that plots refresh
             self._refresh_figures()
