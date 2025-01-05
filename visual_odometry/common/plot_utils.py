@@ -57,14 +57,14 @@ class PlotUtils:
         """
         Plots the landmarks. Plots only the x and z coordinates since the camera is moving on a flat plane.
         """
-        camera_t_wrt_world = pose[:3, 3]
+        # camera_t_wrt_world = pose[:3, 3]
         landmarks_wrt_world = state.X
 
         if frame_id == 0:
-            axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10, label="Pose History")
+            # axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10, label="Pose History")
             axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10, label="ALL Landmarks")
         else:
-            axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
+            # axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
             axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10)
 
     @staticmethod
