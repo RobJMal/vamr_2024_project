@@ -174,6 +174,7 @@ class VisualOdometryPipeline(BaseClass):
 
         # calling the pose estimator
         pose_success, camera_rot_matrix_wrt_world, camera_trans_vec_wrt_world = self.pose_estimator(updated_state, self.K, prev_pose, frame_id)
+
         if pose_success:
             pose = PoseEstimator.cvt_rot_trans_to_pose(camera_rot_matrix_wrt_world, camera_trans_vec_wrt_world)
 

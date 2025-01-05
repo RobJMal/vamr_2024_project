@@ -168,5 +168,4 @@ class PoseEstimator(BaseClass):
         self.vis_axs[*fig_id].plot(self.inlier_history['frames'], self.inlier_history['inliers'], marker='o')
         self.vis_axs[*fig_id].set_xlabel("Frame")
         self.vis_axs[*fig_id].set_ylabel("Number of inliers")
-
     # endregion
