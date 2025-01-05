@@ -106,15 +106,13 @@ class PoseEstimator(BaseClass):
         rot_matrix_wrt_world = rot_matrix_wrt_camera.T
         trans_vec_wrt_world = -rot_matrix_wrt_world @ trans_vec_wrt_camera
 
-        success = True
         if ret_val:
             self._debug_print(f"Rotation Matrix (wrt world frame): {rot_matrix_wrt_world}")
             self._debug_print(f"Translation Vector (wrt to world frame): {trans_vec_wrt_world}")
         else:
-            success = False
             self._info_print("Pose estimation failed.")
 
-        return success, rot_matrix_wrt_world, trans_vec_wrt_world
+        return ret_val, rot_matrix_wrt_world, trans_vec_wrt_world
 
     # region Visualization Debugging
     @BaseClass.plot_debug
