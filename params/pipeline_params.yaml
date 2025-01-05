@@ -20,7 +20,7 @@ pose_estimator:
   pnp_ransac_iterations: 100                  # Number of iterations (default: 100)
   pnp_ransac_reprojection_error: 8.0          # Inlier threshold used by RANSAC (default: 8.0)
   pnp_ransac_confidence: 0.99                 # Probability that algorithm produces a useful result (default: 0.99)
-  use_reprojection_error_optimization: false
+  use_reprojection_error_optimization: true
 
 # module: landmark_triangulation
 landmark_triangulation:
