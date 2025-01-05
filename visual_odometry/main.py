@@ -271,6 +271,7 @@ class VisualOdometryPipeline(BaseClass):
         """
         Plotting the keypoints on the image
         """
+        self.vis_axs[*fig_id].clear()
         self.vis_axs[*fig_id].set_title("Keypoints on Image")
 
         self.vis_axs[*fig_id].imshow(image, cmap="gray")
@@ -280,11 +281,10 @@ class VisualOdometryPipeline(BaseClass):
         """
         Plots all of the subplots in the main visualization.
         """
-        self._plot_full_trajectory((0, 0), pose, frame_id)
-        self._plot_trajectory_and_landmarks((0, 1), pose, state, frame_id)
+        self._plot_keypoints_on_frame((0, 0), image, state)
         self._plot_keypoint_tracking_count((1, 0), state, frame_id)
-        self._plot_keypoints_on_frame((1, 1), image, state)
-        # self._plot_trajectory_and_landmarks_history((1, 1), pose, state, frame_id)
+        self._plot_trajectory_and_landmarks((0, 1), pose, state, frame_id)
+        self._plot_full_trajectory((1, 1), pose, frame_id)
     # endregion
 
     # region RUN
