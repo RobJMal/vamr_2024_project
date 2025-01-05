@@ -276,34 +276,6 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].imshow(image, cmap="gray")
         self.vis_axs[*fig_id].scatter(state.P[0, :], state.P[1, :], color="red", s=2)
 
-
-    # def visualize(self, *args, **kwargs):
-    #     """Visualization method for debugging."""
-    #     # get the axis from the figure
-    #     ax = self.debug_fig.gca()
-    #     ax.clear()
-    #     ax.set_title("DEBUG VISUALIZATION - Keypoint tracking")
-
-    #     # plot the image
-    #     ax.imshow(kwargs["image"], cmap="gray")
-    #     ax.scatter(kwargs["P_old_discarded"][0, :], kwargs["P_old_discarded"][1, :], c="r", s=2, marker="x")
-    #     ax.scatter(kwargs["P_old_matching"][0, :], kwargs["P_old_matching"][1, :], c="b", s=2)
-    #     ax.scatter(kwargs["P_new"][0, :], kwargs["P_new"][1, :], c="g", s=5)
-        
-    #     #for i in range(kwargs["P_old_matching"].shape[1]):  
-    #     #    ax.plot([kwargs["P_old_matching"][0, i], kwargs["P_new"][0, i]], 
-    #     #            [kwargs["P_old_matching"][1, i], kwargs["P_new"][1, i]], c="magenta", linewidth=1)
-        
-    #     ax.plot(
-    #         np.stack([kwargs["P_old_matching"][0, :], kwargs["P_new"][0, :]], axis=0),
-    #         np.stack([kwargs["P_old_matching"][1, :], kwargs["P_new"][1, :]], axis=0),
-    #         color='magenta', linestyle='-', linewidth=1)
-        
-    #     ax.legend(["Discarded points", "Matched points", "New points"], fontsize=8)
-
-    #     plt.draw()
-    #     plt.pause(.1)
-
     def _plot_vo_vis_main(self, pose: Pose, state: State, image: np.ndarray, frame_id: int=0):
         """
         Plots all of the subplots in the main visualization.
@@ -313,7 +285,6 @@ class VisualOdometryPipeline(BaseClass):
         self._plot_keypoint_tracking_count((1, 0), state, frame_id)
         self._plot_keypoints_on_frame((1, 1), image, state)
         # self._plot_trajectory_and_landmarks_history((1, 1), pose, state, frame_id)
-
     # endregion
 
     # region RUN
