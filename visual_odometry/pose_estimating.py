@@ -42,7 +42,7 @@ class PoseEstimator(BaseClass):
             ])
 
 
-    def __call__(self, state: State, K_matrix: np.ndarray, init_pose: Pose = None) -> Tuple[bool, NDArray, NDArray]:
+    def __call__(self, state: State, K_matrix: np.ndarray, init_pose: Pose, frame_id: int=0) -> Tuple[bool, NDArray, NDArray]:
         """
         Main method for pose estimation.
 
@@ -79,30 +79,38 @@ class PoseEstimator(BaseClass):
             confidence=self.params["pnp_ransac_confidence"]
         )
 
-        self._plot_pose_and_landmarks((0, 0), init_pose, state)
+        self._plot_pose_and_landmarks((0, 0), init_pose, state, plot_title="Pose and Landmarks")
 
-        # landmarks_inliers = state.X[:, inliers.flatten()]
-        # keypoints_inliers = state.P[:, inliers.flatten()]
-        # state_inliers = State(keypoints_inliers, landmarks_inliers)
+        # Extracting inliers
+        landmarks_inliers = state.X[:, inliers.flatten()]
+        keypoints_inliers = state.P[:, inliers.flatten()]
+        state_inliers = State(keypoints_inliers, landmarks_inliers)
 
-        # # Applying nonlinear optimization using inliers 
-        # if self.params["use_reprojection_error_optimization"]:
-        #     rot_vec_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(landmarks_inliers.T, keypoints_inliers.T, K_matrix.T, 
-        #                                                                        distCoeffs=distortion_matrix,
-        #                                                                        rvec=rot_vec_wrt_camera, tvec=trans_vec_wrt_camera)
-            
-        #     if self.debug >= LogLevel.VISUALIZATION:
-        #         rot_matrix_wrt_camera_vis, _ = cv2.Rodrigues(rot_vec_wrt_camera)
+        # Applying nonlinear optimization using inliers 
+        if self.params["use_reprojection_error_optimization"]:
+            rot_vec_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(
+                objectPoints=landmarks_inliers.T, 
+                imagePoints=keypoints_inliers.T, 
+                cameraMatrix=K_matrix, 
+                distCoeffs=distortion_matrix,
+                rvec=rot_vec_wrt_camera, 
+                tvec=trans_vec_wrt_camera
+            )
 
-        #         # Applying transform to make it wrt world frame
-        #         rot_matrix_wrt_world_vis = rot_matrix_wrt_camera_vis.T
-        #         trans_vector_wrt_world_vis = -rot_matrix_wrt_world_vis @ trans_vec_wrt_camera
+            # Visualizing the inliers used for pose estimation after optimization
+            if self.debug >= LogLevel.VISUALIZATION:
+                rot_matrix_wrt_camera_vis, _ = cv2.Rodrigues(rot_vec_wrt_camera)
 
-        #         pose_estimation_with_inliers = self.cvt_rot_trans_to_pose(rot_matrix_wrt_world_vis, trans_vector_wrt_world_vis)
-        #         self._plot_pose_and_landmarks((0, 0), pose_estimation_with_inliers, state_inliers)
+                # Applying transform to make it wrt world frame
+                rot_matrix_wrt_world_vis = rot_matrix_wrt_camera_vis.T
+                trans_vector_wrt_world_vis = -rot_matrix_wrt_world_vis @ trans_vec_wrt_camera
+                pose_estimation_with_inliers = self.cvt_rot_trans_to_pose(rot_matrix_wrt_world_vis, trans_vector_wrt_world_vis)
 
+                self._plot_pose_and_landmarks((0, 1), pose_estimation_with_inliers, state_inliers, plot_title="Pose and Landmarks (using Inliers)")
+                self._plot_num_inliers_history((1, 1), state, frame_id=frame_id)
+
+        # Converting output to world frame
         rot_matrix_wrt_camera, _ = cv2.Rodrigues(rot_vec_wrt_camera)
-
         rot_matrix_wrt_world = rot_matrix_wrt_camera.T
         trans_vec_wrt_world = -rot_matrix_wrt_world @ trans_vec_wrt_camera
 
@@ -121,7 +129,7 @@ class PoseEstimator(BaseClass):
         self.vis_figure.suptitle("DEBUG VISUALIZATION: Pose Estimation")
 
     @BaseClass.plot_debug
-    def _plot_pose_and_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State):
+    def _plot_pose_and_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State, plot_title: str = "Pose and Landmarks"):
         """
         Plots the camera pose and the landmarks in the world frame.
 
@@ -132,11 +140,32 @@ class PoseEstimator(BaseClass):
         """
         self.vis_axs[*fig_id].clear()
 
-        self.vis_axs[*fig_id].set_title("Pose and Landmarks (using inliers only)")
+        self.vis_axs[*fig_id].set_title(plot_title)
         PlotUtils._plot_trajectory(self.vis_axs[*fig_id], pose, frame_id=0, plot_ground_truth=False)
         PlotUtils._plot_landmarks(self.vis_axs[*fig_id], pose, state, frame_id=0)
         self.vis_axs[*fig_id].legend()
         self.vis_axs[*fig_id].set_xlabel("X")
         self.vis_axs[*fig_id].set_ylabel("Z")
 
+    @BaseClass.plot_debug
+    def _plot_num_inliers_history(self, fig_id: Tuple[int, int], state: State, frame_id: int = 0):
+        """
+        Plots the number of inliers over time.
+        """
+        # Maintain history of frames and keypoint counts. This is 
+        # enable us to plot the history of keypoints tracked as a line
+        if not hasattr(self, 'inlier_history'):
+            self.inlier_history = {'frames': [], 'inliers': []}
+
+        # Append current frame and keypoint count to the history. 
+        self.inlier_history['frames'].append(frame_id)
+        self.inlier_history['inliers'].append(state.P.shape[1])
+
+        # Clear the axis for fresh plotting
+        self.vis_axs[*fig_id].clear()
+
+        self.vis_axs[*fig_id].set_title("Inlier Tracking Count")
+        self.vis_axs[*fig_id].plot(self.inlier_history['frames'], self.inlier_history['inliers'], marker='o')
+        self.vis_axs[*fig_id].set_xlabel("Frame")
+        self.vis_axs[*fig_id].set_ylabel("Number of inliers")
     # endregion
