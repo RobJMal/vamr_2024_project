@@ -79,20 +79,27 @@ class PoseEstimator(BaseClass):
             confidence=self.params["pnp_ransac_confidence"]
         )
 
-        self._plot_pose_and_landmarks((0, 0), init_pose, state)
+        self._plot_pose_and_landmarks((0, 0), init_pose, state, plot_title="Pose and Landmarks")
 
-        # landmarks_inliers = state.X[:, inliers.flatten()]
-        # keypoints_inliers = state.P[:, inliers.flatten()]
-        # state_inliers = State(keypoints_inliers, landmarks_inliers)
+        # Extracting inliers
+        landmarks_inliers = state.X[:, inliers.flatten()]
+        keypoints_inliers = state.P[:, inliers.flatten()]
+        state_inliers = State(keypoints_inliers, landmarks_inliers)
 
-        # # Applying nonlinear optimization using inliers 
-        # if self.params["use_reprojection_error_optimization"]:
-        #     rot_vec_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(landmarks_inliers.T, keypoints_inliers.T, K_matrix.T, 
-        #                                                                        distCoeffs=distortion_matrix,
-        #                                                                        rvec=rot_vec_wrt_camera, tvec=trans_vec_wrt_camera)
-            
-        #     if self.debug >= LogLevel.VISUALIZATION:
-        #         rot_matrix_wrt_camera_vis, _ = cv2.Rodrigues(rot_vec_wrt_camera)
+        # Applying nonlinear optimization using inliers 
+        if self.params["use_reprojection_error_optimization"]:
+            rot_vec_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(
+                objectPoints=landmarks_inliers.T, 
+                imagePoints=keypoints_inliers.T, 
+                cameraMatrix=K_matrix, 
+                distCoeffs=distortion_matrix,
+                rvec=rot_vec_wrt_camera, 
+                tvec=trans_vec_wrt_camera
+            )
+
+            # Visualizing the inliers used for pose estimation after optimization
+            if self.debug >= LogLevel.VISUALIZATION:
+                rot_matrix_wrt_camera_vis, _ = cv2.Rodrigues(rot_vec_wrt_camera)
 
                 # Applying transform to make it wrt world frame
                 rot_matrix_wrt_world_vis = rot_matrix_wrt_camera_vis.T
@@ -102,8 +109,8 @@ class PoseEstimator(BaseClass):
                 self._plot_pose_and_landmarks((0, 1), pose_estimation_with_inliers, state_inliers, plot_title="Pose and Landmarks (using Inliers)")
                 self._plot_num_inliers_history((1, 1), state, frame_id=frame_id)
 
+        # Converting output to world frame
         rot_matrix_wrt_camera, _ = cv2.Rodrigues(rot_vec_wrt_camera)
-
         rot_matrix_wrt_world = rot_matrix_wrt_camera.T
         trans_vec_wrt_world = -rot_matrix_wrt_world @ trans_vec_wrt_camera
 
