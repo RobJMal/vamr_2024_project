@@ -104,6 +104,34 @@ class Initialization(BaseClass):
         self._refresh_figures()
 
         return state
+    
+    @staticmethod
+    def get_harris_keypoints_and_sift_descriptors(image: np.ndarray):
+        """Method to get the Harris keypoints and SIFT descriptors of an image.
+
+        :param image: Image to get the keypoints and descriptors.
+        :type image: np.ndarray
+        :return: Harris keypoints and SIFT descriptors.
+        :rtype: [cv2.KeyPoint], np.ndarray
+        """
+
+        # Detect Harris corners
+        harris_corners = cv2.cornerHarris(image, blockSize=5, ksize=5, k=0.06)
+        harris_corners = cv2.dilate(harris_corners, None)
+
+        # Thresholding
+        threshold = 0.05 * harris_corners.max()
+        keypoints = np.argwhere(harris_corners > threshold)
+
+        keypoints = [cv2.KeyPoint(float(x), float(y), 1) for y, x in keypoints]
+
+        # Use SIFT descriptor
+        sift = cv2.SIFT_create()
+
+        # Find descriptors
+        keypoints, descriptors = sift.compute(image, keypoints)
+
+        return keypoints, descriptors
 
     @staticmethod
     def get_keypoints_and_matches(image_0: np.ndarray, image_1: np.ndarray):
@@ -117,12 +145,9 @@ class Initialization(BaseClass):
         :rtype: [cv2.KeyPoint], [cv2.KeyPoint], [cv2.DMatch]
         """
 
-        # Use SIFT descriptor
-        sift = cv2.SIFT_create()
-
         # Find keypoints and descriptors
-        keypoints_0, descriptors_0 = sift.detectAndCompute(image_0, None)
-        keypoints_1, descriptors_1 = sift.detectAndCompute(image_1, None)
+        keypoints_0, descriptors_0 = Initialization.get_harris_keypoints_and_sift_descriptors(image_0)
+        keypoints_1, descriptors_1 = Initialization.get_harris_keypoints_and_sift_descriptors(image_1)
 
         # Match descriptors
         bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
