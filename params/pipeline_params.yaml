@@ -1,5 +1,8 @@
 # Description: Parameters for the pipeline
 
+main:
+  keyframeFreq: 5 # Every 5 frames, perform landmark triangulation
+
 initialization:
   # parameters for the initialization module
   bootstrap_frames: [0, 2]
@@ -35,5 +38,5 @@ landmark_triangulation:
   landmarkAngleThreshold: 0.1 # radians # 30 degrees
   maxNewKeypointsPerIter: 100 # Create n windows and select one point from this. Must be a square number since we use windowing to achieve this
   applyWindowThresholding: true
-  reprojectionErrorThreshold: 0.4 # pixel distance
+  reprojectionErrorThreshold: 0.5 # pixel distance
   applyReprojectionErrorRejection: true
