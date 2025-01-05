@@ -52,12 +52,14 @@ class VisualOdometryPipeline(BaseClass):
                                "PARKING": os.path.join(os.path.dirname(os.path.dirname(__file__)), "datasets/parking")}
 
         self._init_figures()
+        self.params = self._param_server["main"]
         self.left_images: Optional[list[str]] = None # Will be None if dataset is not Malaga
 
         self.initialization = Initialization(param_server=self._param_server, debug=self.debug)
         self.keypoint_tracker = KeypointTracker(param_server=self._param_server, debug=self.debug)
         self.pose_estimator = PoseEstimator(param_server=self._param_server, debug=self.debug)
         self.landmark_triangulation = LandmarkTriangulation(param_server=self._param_server, debug=self.debug)
+        self.keyframe_frequency = self.params["keyframeFreq"]
 
         self._info_print(
             f"VO monocular pipeline initialized\n - Log level: {debug.name}\n - ParamServer: {self._param_server}")
@@ -168,7 +170,7 @@ class VisualOdometryPipeline(BaseClass):
                 "No keypoints provided for initialization for dataset other than KITTI")
         return self._get_kitti_debug_points()
 
-    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int, prev_pose: Pose) -> State:
+    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int, prev_pose: Pose) -> Tuple[State, Pose]:
         # From the previous image and previous state containing keypoints and landmarks,
         # figure out which keypoints carried over in the new image and return that set of P and X
         updated_state = self.keypoint_tracker(self.K, prev_state, prev_image, curr_image)
@@ -176,13 +178,15 @@ class VisualOdometryPipeline(BaseClass):
         # calling the pose estimator
         pose_success, camera_rot_matrix_wrt_world, camera_trans_vec_wrt_world = self.pose_estimator(updated_state, self.K, prev_pose, frame_id)
 
+        pose = prev_pose
         if pose_success:
             pose = PoseEstimator.cvt_rot_trans_to_pose(camera_rot_matrix_wrt_world, camera_trans_vec_wrt_world)
 
-            # Find and triangulate new landmarks
-            updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
-            self._plot_vo_vis_main(pose, updated_state, curr_image, frame_id)
+            if frame_id % self.keyframe_frequency is 0:
+                # Find and triangulate new landmarks
+                updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
 
+        self._plot_vo_vis_main(pose, updated_state, curr_image, frame_id)
         return updated_state, pose
 
     # region Visual Odometry main visualization methods
