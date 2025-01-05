@@ -75,6 +75,18 @@ class KeypointTracker(BaseClass):
         P_new_matching = P_new_matching[inliers.ravel() == 1]
         P_old_matching = P_old_matching[inliers.ravel() == 1]
         X_matching = X_matching[:, inliers.ravel() == 1]
+
+        # enforce temporal consistency
+        dists = np.linalg.norm(P_new_matching - P_old_matching, axis=1)
+        mean_dist = np.mean(dists)
+        std_dist = np.std(dists)
+        inliers = dists < mean_dist + self.params["allowed_std"] * std_dist
+
+        P_new_matching = P_new_matching[inliers]
+        P_old_matching = P_old_matching[inliers]
+        X_matching = X_matching[:, inliers.ravel() == 1]
+
+
         
         state.P = P_new_matching.T # back to 2xN representation
         state.X = X_matching
