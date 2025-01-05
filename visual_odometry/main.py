@@ -152,6 +152,7 @@ class VisualOdometryPipeline(BaseClass):
             else:
                 raise AssertionError("Invalid dataset selection")
 
+            self.image_0 = img0
 
             # setup for continuous operation
             state = self.initialization(img0, img1, self.K, dataset == DataSet.KITTI)
@@ -185,7 +186,7 @@ class VisualOdometryPipeline(BaseClass):
                 # Find and triangulate new landmarks
                 updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
 
-        self._plot_vo_vis_main(pose, updated_state, frame_id)
+        self._plot_vo_vis_main(pose, updated_state, curr_image, frame_id)
         return updated_state, pose
 
     # region Visual Odometry main visualization methods
@@ -270,15 +271,24 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
-    def _plot_vo_vis_main(self, pose: Pose, state: State, frame_id: int=0):
+    def _plot_keypoints_on_frame(self, fig_id: Tuple[int, int], image, state: State):
+        """
+        Plotting the keypoints on the image
+        """
+        self.vis_axs[*fig_id].clear()
+        self.vis_axs[*fig_id].set_title("Keypoints on Image")
+
+        self.vis_axs[*fig_id].imshow(image, cmap="gray")
+        self.vis_axs[*fig_id].scatter(state.P[0, :], state.P[1, :], color="red", s=2)
+
+    def _plot_vo_vis_main(self, pose: Pose, state: State, image: np.ndarray, frame_id: int=0):
         """
         Plots all of the subplots in the main visualization.
         """
-        self._plot_full_trajectory((0, 0), pose, frame_id)
-        self._plot_trajectory_and_landmarks((0, 1), pose, state, frame_id)
+        self._plot_keypoints_on_frame((0, 0), image, state)
         self._plot_keypoint_tracking_count((1, 0), state, frame_id)
-        self._plot_trajectory_and_landmarks_history((1, 1), pose, state, frame_id)
-
+        self._plot_trajectory_and_landmarks((0, 1), pose, state, frame_id)
+        self._plot_full_trajectory((1, 1), pose, frame_id)
     # endregion
 
     # region RUN
@@ -288,7 +298,7 @@ class VisualOdometryPipeline(BaseClass):
         state, image_range, prev_image = self._init_dataset(dataset, use_bootstrap)
         prev_pose = self.world_pose
 
-        self._plot_vo_vis_main(self.world_pose, state, frame_id = 0)
+        self._plot_vo_vis_main(self.world_pose, state, self.image_0, frame_id = 0)
 
         ### Continuous Operation ###
         for frame_id in image_range:
