@@ -34,7 +34,7 @@ class KeypointTracker(BaseClass):
         self.debug_fig = plt.figure() # figure for visualization
         ax = self.debug_fig.gca()
 
-    def __call__(self, state: State, previous_image: np.ndarray, current_image: np.ndarray) -> State:
+    def __call__(self, state: State, previous_image: np.ndarray, current_image: np.ndarray, K: np.ndarray) -> State:
         """Main method for keypoint tracking.
         
         :param state: State object contaiing information about the current estimate
@@ -44,8 +44,6 @@ class KeypointTracker(BaseClass):
         :param current_image: Current image frame.
         :type current_image: np.ndarray        
         """
-        # TODO: might be enough to pass P and return the new P
-        # specifically this method only needs state.P to return a new state P and previous_image, current_image
 
         P_old = state.P.copy()
         X = state.X.copy()
@@ -69,7 +67,8 @@ class KeypointTracker(BaseClass):
 
 
         # find the fundamental matrix with ransac
-        _, inliers = cv2.findFundamentalMat(P_old_matching, P_new_matching, cv2.FM_RANSAC)
+        #_, inliers = cv2.findFundamentalMat(P_old_matching, P_new_matching, cv2.FM_RANSAC)
+        _, inliers = cv2.findEssentialMat(P_old_matching, P_new_matching, K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
         if np.sum(inliers) < self.params["min_inliers"]:
             raise ValueError(f"Not enough inliers found. Minimum {self.params['min_inliers']} required.")
         
