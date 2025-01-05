@@ -8,6 +8,7 @@ from visual_odometry.common.enums import LogLevel
 from visual_odometry.common import BaseClass
 from visual_odometry.common import State
 from visual_odometry.common import ParamServer
+from visual_odometry.common.plot_utils import PlotUtils
 from visual_odometry.common.state import Pose
 
 class PoseEstimator(BaseClass):
@@ -21,15 +22,12 @@ class PoseEstimator(BaseClass):
         :type debug: LogLevel
         """
         super().__init__(debug)
+        self._init_figure()
         self._info_print("Pose estimator initialized.")
         
         # Retrieve required parameters from the ParamServer
         self.params = param_server["pose_estimator"]
         
-    @BaseClass.plot_debug
-    def _init_figure(self):
-        self.debug_fig = plt.figure()
-
     @staticmethod
     def cvt_rot_trans_to_pose(rot_matrix: NDArray, trans_vec: NDArray) -> Pose:
         return np.block([
@@ -57,11 +55,26 @@ class PoseEstimator(BaseClass):
                                                                   iterationsCount=self.params["pnp_ransac_iterations"],
                                                                   reprojectionError=self.params["pnp_ransac_reprojection_error"],
                                                                   confidence=self.params["pnp_ransac_confidence"])
-        
+
+        landmarks_inliers = state.X[:, inliers.flatten()]
+        keypoints_inliers = state.P[:, inliers.flatten()]
+        state_inliers = State(keypoints_inliers, landmarks_inliers)
+
+        # Applying nonlinear optimization using inliers 
         if self.params["use_reprojection_error_optimization"]:
-            rot_matrix_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(state.X.T, state.P.T, K_matrix, 
+            rot_vec_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(landmarks_inliers.T, keypoints_inliers.T, K_matrix.T, 
                                                                                distCoeffs=distortion_matrix,
                                                                                rvec=rot_vec_wrt_camera, tvec=trans_vec_wrt_camera)
+            
+            if self.debug >= LogLevel.VISUALIZATION:
+                rot_matrix_wrt_camera_vis, _ = cv2.Rodrigues(rot_vec_wrt_camera)
+
+                # Applying transform to make it wrt world frame
+                rot_matrix_wrt_world_vis = rot_matrix_wrt_camera_vis.T
+                trans_vector_wrt_world_vis = -rot_matrix_wrt_world_vis @ trans_vec_wrt_camera
+
+                pose_estimation_with_inliers = self.cvt_rot_trans_to_pose(rot_matrix_wrt_world_vis, trans_vector_wrt_world_vis)
+                self._plot_pose_and_landmarks((0, 0), pose_estimation_with_inliers, state_inliers)
 
         rot_matrix_wrt_camera, _ = cv2.Rodrigues(rot_vec_wrt_camera)
 
@@ -72,9 +85,35 @@ class PoseEstimator(BaseClass):
         if ret_val:
             self._debug_print(f"Rotation Matrix (wrt world frame): {rot_matrix_wrt_world}")
             self._debug_print(f"Translation Vector (wrt to world frame): {trans_vec_wrt_world}")
-            self._debug_print(f"Inliers: {inliers}")
         else:
             success = False
             self._info_print("Pose estimation failed.")
 
         return success, rot_matrix_wrt_world, trans_vec_wrt_world
+
+    # region Visualization Debugging
+    @BaseClass.plot_debug
+    def _init_figure(self):
+        self.vis_figure, self.vis_axs = plt.subplots(2, 2, figsize=(20, 8))
+        self.vis_figure.suptitle("DEBUG VISUALIZATION: Pose Estimation")
+
+    @BaseClass.plot_debug
+    def _plot_pose_and_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State):
+        """
+        Plots the camera pose and the landmarks in the world frame.
+
+        :param pose: Camera pose in the world frame.
+        :type pose: Pose
+        :param state: State object containing the landmarks.
+        :type state: State
+        """
+        self.vis_axs[*fig_id].clear()
+
+        self.vis_axs[*fig_id].set_title("Pose and Landmarks (using inliers only)")
+        PlotUtils._plot_trajectory(self.vis_axs[*fig_id], pose, frame_id=0, plot_ground_truth=False)
+        PlotUtils._plot_landmarks(self.vis_axs[*fig_id], pose, state, frame_id=0)
+        self.vis_axs[*fig_id].legend()
+        self.vis_axs[*fig_id].set_xlabel("X")
+        self.vis_axs[*fig_id].set_ylabel("Z")
+
+    # endregion
