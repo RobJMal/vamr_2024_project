@@ -30,6 +30,12 @@ class PoseEstimator(BaseClass):
         
     @staticmethod
     def cvt_rot_trans_to_pose(rot_matrix: NDArray, trans_vec: NDArray) -> Pose:
+        """
+        Converts rotation matrix and translation vector into a pose matrix.
+        """
+        if trans_vec.shape != (3, 1):
+            trans_vec = trans_vec.reshape(3, 1)
+
         return np.block([
             [rot_matrix, trans_vec],
             [np.zeros((1, 3)), 1]
