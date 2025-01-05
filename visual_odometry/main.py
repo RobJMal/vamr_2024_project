@@ -167,21 +167,21 @@ class VisualOdometryPipeline(BaseClass):
                 "No keypoints provided for initialization for dataset other than KITTI")
         return self._get_kitti_debug_points()
 
-    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int) -> State:
+    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int, prev_pose: Pose) -> State:
         # From the previous image and previous state containing keypoints and landmarks,
         # figure out which keypoints carried over in the new image and return that set of P and X
         updated_state = self.keypoint_tracker(self.K, prev_state, prev_image, curr_image)
 
         # calling the pose estimator
-        pose_success, R, t = self.pose_estimator(updated_state, self.K)
+        pose_success, camera_rot_matrix_wrt_world, camera_trans_vec_wrt_world = self.pose_estimator(updated_state, self.K, prev_pose)
         if pose_success:
-            pose = PoseEstimator.cvt_rot_trans_to_pose(R, t)
+            pose = PoseEstimator.cvt_rot_trans_to_pose(camera_rot_matrix_wrt_world, camera_trans_vec_wrt_world)
 
             # Find and triangulate new landmarks
             updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
             self._plot_vo_vis_main(pose, updated_state, frame_id)
 
-        return updated_state
+        return updated_state, pose
 
     # region Visual Odometry main visualization methods
     def _init_figures(self):
@@ -276,10 +276,12 @@ class VisualOdometryPipeline(BaseClass):
 
     # endregion
 
+    # region RUN
     def run(self, dataset: DataSet = DataSet.KITTI, use_bootstrap: bool = True):
         self._info_print(f"Running pipeline for dataset: {dataset.name}, bootstrap: {use_bootstrap}")
 
         state, image_range, prev_image = self._init_dataset(dataset, use_bootstrap)
+        prev_pose = self.world_pose
 
         self._plot_vo_vis_main(self.world_pose, state, frame_id = 0)
 
@@ -301,7 +303,7 @@ class VisualOdometryPipeline(BaseClass):
                     image = np.array(cv2.imread(image_path, cv2.IMREAD_GRAYSCALE))
                     image = cv2.convertScaleAbs(image)
 
-            new_state = self._process_frame(image, prev_image, state, frame_id)
+            new_state, new_pose = self._process_frame(image, prev_image, state, frame_id, prev_pose)
 
             # Makes sure that plots refresh
             self._refresh_figures()
@@ -310,7 +312,8 @@ class VisualOdometryPipeline(BaseClass):
             # Prepare for the next iteration
             prev_image = image
             state = new_state
-
+            prev_pose = new_pose
+    # endregion 
 
 
 def main():

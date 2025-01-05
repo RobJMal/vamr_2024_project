@@ -42,7 +42,7 @@ class PoseEstimator(BaseClass):
             ])
 
 
-    def __call__(self, state: State, K_matrix: np.ndarray) -> Tuple[bool, NDArray, NDArray]:
+    def __call__(self, state: State, K_matrix: np.ndarray, init_pose: Pose = None) -> Tuple[bool, NDArray, NDArray]:
         """
         Main method for pose estimation.
 
@@ -50,37 +50,56 @@ class PoseEstimator(BaseClass):
         :type State: State 
         :param K:
         :type: K: np.ndarray
+        :param init_pose: Initial pose of the camera.
+        :type init_pose: Pose
         """
+        init_rot_matrix = init_pose[:3, :3]
+        init_trans_vec = init_pose[:3, 3]
+
+        # Converting initial pose of camera to camera frame
+        init_rot_matrix_wrt_camera = init_rot_matrix.T
+        init_trans_vec_wrt_camera = -init_rot_matrix.T @ init_trans_vec
+        init_trans_vec_wrt_camera = init_trans_vec_wrt_camera.reshape(3, 1)
+        init_rot_vec_wrt_camera, _ = cv2.Rodrigues(init_rot_matrix_wrt_camera)
+
         # Assuming no distortion
         distortion_matrix = np.zeros((1,5))
 
         # Transposing since cv2 inverts rows and cols representation
-        ret_val, rot_vec_wrt_camera, trans_vec_wrt_camera, inliers = cv2.solvePnPRansac(state.X.T, state.P.T, K_matrix,            
-                                                                  distCoeffs=distortion_matrix, 
-                                                                  useExtrinsicGuess=self.params["use_extrinsic_guess"],
-                                                                  iterationsCount=self.params["pnp_ransac_iterations"],
-                                                                  reprojectionError=self.params["pnp_ransac_reprojection_error"],
-                                                                  confidence=self.params["pnp_ransac_confidence"])
+        ret_val, rot_vec_wrt_camera, trans_vec_wrt_camera, inliers = cv2.solvePnPRansac(
+            objectPoints=state.X.T, 
+            imagePoints=state.P.T, 
+            cameraMatrix=K_matrix,            
+            distCoeffs=distortion_matrix, 
+            rvec=init_rot_vec_wrt_camera,
+            tvec=init_trans_vec_wrt_camera,
+            useExtrinsicGuess=True,
+            iterationsCount=self.params["pnp_ransac_iterations"],
+            reprojectionError=self.params["pnp_ransac_reprojection_error"],
+            confidence=self.params["pnp_ransac_confidence"]
+        )
 
-        landmarks_inliers = state.X[:, inliers.flatten()]
-        keypoints_inliers = state.P[:, inliers.flatten()]
-        state_inliers = State(keypoints_inliers, landmarks_inliers)
+        self._plot_pose_and_landmarks((0, 0), init_pose, state)
 
-        # Applying nonlinear optimization using inliers 
-        if self.params["use_reprojection_error_optimization"]:
-            rot_vec_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(landmarks_inliers.T, keypoints_inliers.T, K_matrix.T, 
-                                                                               distCoeffs=distortion_matrix,
-                                                                               rvec=rot_vec_wrt_camera, tvec=trans_vec_wrt_camera)
+        # landmarks_inliers = state.X[:, inliers.flatten()]
+        # keypoints_inliers = state.P[:, inliers.flatten()]
+        # state_inliers = State(keypoints_inliers, landmarks_inliers)
+
+        # # Applying nonlinear optimization using inliers 
+        # if self.params["use_reprojection_error_optimization"]:
+        #     rot_vec_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(landmarks_inliers.T, keypoints_inliers.T, K_matrix.T, 
+        #                                                                        distCoeffs=distortion_matrix,
+        #                                                                        rvec=rot_vec_wrt_camera, tvec=trans_vec_wrt_camera)
             
-            if self.debug >= LogLevel.VISUALIZATION:
-                rot_matrix_wrt_camera_vis, _ = cv2.Rodrigues(rot_vec_wrt_camera)
+        #     if self.debug >= LogLevel.VISUALIZATION:
+        #         rot_matrix_wrt_camera_vis, _ = cv2.Rodrigues(rot_vec_wrt_camera)
 
-                # Applying transform to make it wrt world frame
-                rot_matrix_wrt_world_vis = rot_matrix_wrt_camera_vis.T
-                trans_vector_wrt_world_vis = -rot_matrix_wrt_world_vis @ trans_vec_wrt_camera
+        #         # Applying transform to make it wrt world frame
+        #         rot_matrix_wrt_world_vis = rot_matrix_wrt_camera_vis.T
+        #         trans_vector_wrt_world_vis = -rot_matrix_wrt_world_vis @ trans_vec_wrt_camera
 
-                pose_estimation_with_inliers = self.cvt_rot_trans_to_pose(rot_matrix_wrt_world_vis, trans_vector_wrt_world_vis)
-                self._plot_pose_and_landmarks((0, 0), pose_estimation_with_inliers, state_inliers)
+        #         pose_estimation_with_inliers = self.cvt_rot_trans_to_pose(rot_matrix_wrt_world_vis, trans_vector_wrt_world_vis)
+        #         self._plot_pose_and_landmarks((0, 0), pose_estimation_with_inliers, state_inliers)
 
         rot_matrix_wrt_camera, _ = cv2.Rodrigues(rot_vec_wrt_camera)
 
