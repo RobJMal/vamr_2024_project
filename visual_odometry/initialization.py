@@ -115,15 +115,17 @@ class Initialization(BaseClass):
         :rtype: [cv2.KeyPoint], np.ndarray
         """
 
-        # Detect Harris corners
-        harris_corners = cv2.cornerHarris(image, blockSize=5, ksize=5, k=0.06)
-        harris_corners = cv2.dilate(harris_corners, None)
+        # Detect Shi-Tomasi corners (good features to track)
+        corners = cv2.goodFeaturesToTrack(
+            image,
+            maxCorners=0,  # Set to 0 to detect as much as it finds
+            qualityLevel=0.001,
+            minDistance=10,  
+            blockSize=3 
+        )
 
-        # Thresholding
-        threshold = 0.05 * harris_corners.max()
-        keypoints = np.argwhere(harris_corners > threshold)
-
-        keypoints = [cv2.KeyPoint(float(x), float(y), 1) for y, x in keypoints]
+        # Convert corners to cv2.KeyPoint objects
+        keypoints = [cv2.KeyPoint(float(x), float(y), 1) for x, y in corners[:, 0, :]]
 
         # Use SIFT descriptor
         sift = cv2.SIFT_create()
