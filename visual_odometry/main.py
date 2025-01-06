@@ -86,6 +86,8 @@ class VisualOdometryPipeline(BaseClass):
                 self.K: NDArray = np.array([[621.18428, 0, 404.0076],
                               [0, 621.18428, 309.05989],
                               [0, 0, 1]])
+                
+                self.ground_truth = None
             case DataSet.PARKING:
                 self.last_frame: int = 598
                 self.K: NDArray = np.loadtxt(
