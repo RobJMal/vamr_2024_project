@@ -119,7 +119,7 @@ class Initialization(BaseClass):
         corners = cv2.goodFeaturesToTrack(
             image,
             maxCorners=0,  # Set to 0 to detect as much as it finds
-            qualityLevel=0.001,
+            qualityLevel=0.01,
             minDistance=10,  
             blockSize=3 
         )

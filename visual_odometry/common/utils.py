@@ -1,6 +1,7 @@
 from numpy.typing import NDArray
 import numpy as np
 
+
 class Utils:
 
     @staticmethod
@@ -18,3 +19,10 @@ class Utils:
         return (M-1) X N where each of the M-1 Rows are divided by the Mth column
         """
         return mat[:-1, :] / mat[-1, :]
+
+    @staticmethod
+    def homogenous_mat_mult(A: NDArray, B: NDArray):
+        """
+        Perform A @ [B, 1] (homogenize) and then dehomogenize
+        """
+        return Utils.dehomogenize_matrix(A @ Utils.homogenize_matrix(B))
