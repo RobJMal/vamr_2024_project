@@ -33,13 +33,15 @@ VAMR_2024_PROJECT/
 │   │   │   ├── calib.txt
 │   │   │   ├── times.txt
 │   │   │   └── poses/
-│   │   └── kp_for_debug.txt
 |   ├── malaga-urban-dataset-extract-07/
 |   |   ├── ...
 │   ├── parking/
 │   │   ├── images/
 │   │   ├── K.txt
 │   │   └── poses.txt
+├── setup_files/
+│   └── parking/
+|       └── K.txt
 ├── .gitignore
 ├── params/
 ├── visual_odometry/
