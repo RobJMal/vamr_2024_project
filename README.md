@@ -10,6 +10,7 @@ The setup process for our repository is separated into two steps:
 To create a conda environment with all of the dependencies and Python version, run the following commands. Because the visual odometry pipeline we created is a Python package, it will need to be installed as one, hence the second commands:
 ```bash
 conda env create -f environment.yml
+conda activate vamr_project_venv
 pip install -e .
 ```
 
@@ -32,7 +33,7 @@ VAMR_2024_PROJECT/
 │   │   │   ├── image_1/
 │   │   │   ├── calib.txt
 │   │   │   ├── times.txt
-│   │   │   └── poses/
+│   │   └── poses/
 |   ├── malaga-urban-dataset-extract-07/
 |   |   ├── ...
 │   ├── parking/
@@ -81,6 +82,9 @@ To help in the development process, we also added several command-line arguments
 -  `--no-bootstrap`
     - Description: Do not use bootstrap, initialize based on given keypoints
     - Default: `store_false`
+
+**IMPORTANT NOTES**
+- The pipeline runs quite slow (about 1 Hz per frame). It runs especially slow when running in VISUALIZATION mode (about 0.2 Hz per frame) because of all the plots that are being made. During this time, sometimes the pipeline will get stuck processing a frame. From our experience, it would be best to just stop the pipeline and rerun it. 
 
 ## Video Generation and Development
 The screencasts were captured on a laptop computer with an Apple M1 Pro processor with 16 GB RAM running macOS Sequoia 15.11. The project was also tested on the following systems: 
