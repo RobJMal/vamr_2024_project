@@ -88,13 +88,13 @@ class Initialization(BaseClass):
 
         state.P = inliers_0.T[:, ~rejection_mask]
         state.X = points_3D_wrt_0[:, ~rejection_mask]
-        state.C = inliers_0.T[:, ~rejection_mask]
-        state.F = inliers_0.T[:, ~rejection_mask]
+        # state.C = inliers_0.T[:, ~rejection_mask]
+        # state.F = inliers_0.T[:, ~rejection_mask]
 
         # R_cam2_wrt_world = R # R.T
         # t_cam2_wrt_world = t # -R.T @ t
         transform = PoseEstimator.cvt_rot_trans_to_pose(np.eye(3), np.zeros((3, 1))).reshape((-1, 1)) # Convert to transform vector
-        state.Tau = np.tile(transform, state.P.shape[1])
+        # state.Tau = np.tile(transform, state.P.shape[1])
 
         # Compare the bootstrapped keypoints with the keypoints from exercise 7
         if is_KITTI:

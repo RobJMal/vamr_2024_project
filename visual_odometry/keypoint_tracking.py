@@ -8,6 +8,8 @@ from visual_odometry.common.enums import LogLevel
 from visual_odometry.common import BaseClass
 from visual_odometry.common import State
 from visual_odometry.common import ParamServer
+from visual_odometry.common.state import Pose
+from visual_odometry.common.utils import Utils
 
 
 class KeypointTracker(BaseClass):
@@ -101,6 +103,19 @@ class KeypointTracker(BaseClass):
 
         return state
 
+
+    def remove_landmarks_behind_the_camera(self, K, state, pose: Pose) -> State:
+        """
+        Based on the new pose estimation, remove landmarks that will be behind the camera
+        """
+        projections = Utils.dehomogenize_matrix(pose @ Utils.homogenize_matrix(state.X))
+
+        rejection_mask = projections[2, :] < 0
+        self._debug_print(f"After pose estimation, removing {np.sum(rejection_mask)}/{rejection_mask.size} points and landmarks triangulated behind the state from the camera")
+
+        state.P = state.P[:, ~rejection_mask]
+        state.X = state.X[:, ~rejection_mask]
+        return state
 
     def visualize(self, *args, **kwargs):
         """Visualization method for debugging."""

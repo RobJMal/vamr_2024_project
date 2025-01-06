@@ -314,14 +314,20 @@ class LandmarkTriangulation(BaseClass):
         """
         curr_R_ext, curr_t_ext = self._get_extrinsic_from_pose(curr_pose)
         proj_mat_curr: NDArray = K @ np.block([curr_R_ext, curr_t_ext])
-        points_world = np.zeros((3, C.shape[1]))
-        angles = np.zeros(C.shape[1])
+        points_world = np.zeros((3, C.shape[1]), dtype=np.float32)
+        angles = np.zeros(C.shape[1], dtype=np.float32)
+        angles[:] = np.nan
 
         unique_Tau, indx, inverse_indices = np.unique(Tau, return_index=True, return_inverse=True, axis=1)
 
         # Create groups by unique Tau values
         grouped_indices = np.split(np.argsort(inverse_indices), np.unique(np.sort(inverse_indices), return_index=True)[1])
 
+        # for cnt, (cs, fs, taus) in enumerate(zip(C.T, F.T, Tau.T)):
+        #     group_idx = np.array([cnt])
+        #     taus = taus[:, None]
+        #     fs = fs[:, None]
+        #     cs = cs[:, None]
         for group_cnt, group_idx in enumerate(grouped_indices):
             if group_idx.size == 0:
                 continue
@@ -350,6 +356,8 @@ class LandmarkTriangulation(BaseClass):
                 continue
 
             pXs_C_wrt_w, accepted_pts = self._refine_triangulation_with_lm(proj_mat_f, proj_mat_curr, fs[:, ~rear_triangulated_pts], cs[:, ~rear_triangulated_pts], pXs_C_wrt_w)
+            if accepted_pts.size == 0:
+                continue
             group_idx = group_idx[accepted_pts]
             # These are multiple landmarks triangulated from the same pose
             pXs_C_wrt_f = tau @ np.vstack((pXs_C_wrt_w, np.ones(pXs_C_wrt_w.shape[1])))
@@ -359,6 +367,7 @@ class LandmarkTriangulation(BaseClass):
                 dot_products
                 / (np.linalg.norm(pXs_C_wrt_c, axis=0) * np.linalg.norm(pXs_C_wrt_f, axis=0))
             )
+            assert np.all(np.isnan(angles[group_idx])), "Overwriting Initialized Angles"
             angles[group_idx] = alpha
             points_world[:, group_idx] = pXs_C_wrt_w
 
@@ -404,6 +413,8 @@ class LandmarkTriangulation(BaseClass):
             (1, 1), curr_pose, C, points_world, candidates=True, clear=False
         )
 
+        angles[np.isnan(angles)] = 0.0
+        self._info_print(f"Angles: max: {np.max(angles)}, min: {np.min(angles)}")
         eligible_keypoint_mask = angles > self.landmark_angle_threshold
         # reprojection_error_mask = self._get_reprojection_error_mask(C, proj_mat_curr, points_world)
 
@@ -462,6 +473,14 @@ class LandmarkTriangulation(BaseClass):
         prev_state: State,
         curr_pose: Pose,
     ):
+        if prev_state.C.size == 0:
+            # Empty the first time
+            new_candidates = self._provide_new_candidate_keypoints(curr_image, prev_image)
+            C_new, F_new, Tau_new = self._remove_duplicate_candidates_and_add_F_and_Tau(
+                np.empty((2, 0)), new_candidates, np.empty((2, 0)), np.empty((16, 0)), curr_pose
+            )
+
+            return np.empty((2, 0)), np.empty((3, 0)), C_new, F_new, Tau_new
 
         # Filter Lost Candidates First
         self._debug_print(f"Prev state number of candidates: {prev_state.C.shape[1]}")

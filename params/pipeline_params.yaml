@@ -1,7 +1,7 @@
 # Description: Parameters for the pipeline
 
 main:
-  keyframeFreq: 5 # Every 5 frames, perform landmark triangulation
+  keyframeFreq: 1 # Every 5 frames, perform landmark triangulation
 
 initialization:
   # parameters for the initialization module
@@ -35,8 +35,8 @@ landmark_triangulation:
   # min_inliers: 10 # minimum number of inliers to track
   criteria_eps: 0.01 # treshold for the Lucas-Kanade tracker
   criteria_count: 10 # number of iterations for the Lucas-Kanade tracker
-  landmarkAngleThreshold: 0.1 # radians # 30 degrees
+  landmarkAngleThreshold: 0.26 # radians # 15 degrees
   maxNewKeypointsPerIter: 100 # Create n windows and select one point from this. Must be a square number since we use windowing to achieve this
-  applyWindowThresholding: true
-  reprojectionErrorThreshold: 0.5 # pixel distance
+  applyWindowThresholding: false
+  reprojectionErrorThreshold: 2.0 # pixel distance
   applyReprojectionErrorRejection: true

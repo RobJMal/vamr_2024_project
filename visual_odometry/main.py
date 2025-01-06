@@ -157,7 +157,8 @@ class VisualOdometryPipeline(BaseClass):
 
             # setup for continuous operation
             state = self.initialization(img0, img1, self.K, dataset == DataSet.KITTI)
-            self.world_pose: NDArray = state.Tau[:, 0].reshape((4, 4))
+            self.world_pose: NDArray = np.block([[np.eye(3), np.zeros((3, 1))],
+                                                 [ 0, 0, 0, 1 ]])
             from_index = bootstrap_frames[1] + 1
             to_index = self.last_frame + 1
             prev_img = img1
@@ -182,8 +183,9 @@ class VisualOdometryPipeline(BaseClass):
         pose = prev_pose
         if pose_success:
             pose = PoseEstimator.cvt_rot_trans_to_pose(camera_rot_matrix_wrt_world, camera_trans_vec_wrt_world)
+            updated_state = self.keypoint_tracker.remove_landmarks_behind_the_camera(self.K, updated_state, pose)
 
-            if frame_id % self.keyframe_frequency is 0:
+            if frame_id % self.keyframe_frequency == 0:
                 # Find and triangulate new landmarks
                 updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
 

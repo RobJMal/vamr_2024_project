@@ -10,6 +10,7 @@ from visual_odometry.common import State
 from visual_odometry.common import ParamServer
 from visual_odometry.common.plot_utils import PlotUtils
 from visual_odometry.common.state import Pose
+from visual_odometry.common.utils import Utils
 
 class PoseEstimator(BaseClass):
     def __init__(self, param_server: ParamServer, debug: LogLevel = LogLevel.INFO):
