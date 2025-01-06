@@ -15,13 +15,15 @@ The setup process for our repository is separated into two steps:
 - Dataset download and setup
 
 ### Environment setup 
-To create a conda environment with all of the dependencies and Python version, run the following command:
+To create a conda environment with all of the dependencies and Python version, run the following commands. Because the visual odometry pipeline we created is a Python package, it will need to be installed as one, hence the second commands:
 ```
 conda env create -f environment.yml
+pip install -e .
 ```
 
-If you are not running Conda, run the following command. Ensure that your Python's environment is 3.12 or greater:
+Alternatively, install the package dependencies direclty using pip install. Note that your Python version should be 3.12 or greater:
 ```
+pip install -r requirements.txt
 pip install -e .
 ```
 
