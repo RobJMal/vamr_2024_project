@@ -8,13 +8,13 @@ The setup process for our repository is separated into two steps:
 
 ### Environment setup 
 To create a conda environment with all of the dependencies and Python version, run the following commands. Because the visual odometry pipeline we created is a Python package, it will need to be installed as one, hence the second commands:
-```
+```bash
 conda env create -f environment.yml
 pip install -e .
 ```
 
 Alternatively, install the package dependencies direclty using pip install. Note that your Python version should be 3.12 or greater:
-```
+```bash
 pip install -r requirements.txt
 pip install -e .
 ```
@@ -50,8 +50,8 @@ VAMR_2024_PROJECT/
 ```
 
 ## Running the pipeline
-To run the VO pipeline, you would run the following:
-```
+To run the VO pipeline, you would run one of the following commands:
+```bash
 python visual_odometry/main.py --dataset PARKING    # Runs pipeline with PARKING dataset
 python visual_odometry/main.py --dataset KITTI      # Runs pipeline with KITTI dataset
 python visual_odometry/main.py --dataset MALAGA     # Runs pipeline with MALAGA dataset
