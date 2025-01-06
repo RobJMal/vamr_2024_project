@@ -42,11 +42,10 @@ class PlotUtils:
         camera_t_wrt_world = pose[:3, 3]
         camera_rot_matrix = pose[:3, :3]
 
+        camera_t_wrt_world = -camera_rot_matrix.T @ camera_t_wrt_world
+
         # Plotting the z and x axis of the camera
         arrow_length = 0.001
-        arrow_width = 0.005
-        x_axis = camera_rot_matrix[[0, 2], 0] * arrow_length
-        z_axis = camera_rot_matrix[[0, 2], 2] * arrow_length
 
         if frame_id == 0:
             axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10, label="Camera Pose")

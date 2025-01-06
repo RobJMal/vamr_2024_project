@@ -220,10 +220,10 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
-        if self.dataset == DataSet.PARKING:
-            self.vis_axs[*fig_id].set_ylim(-10, 10)
-        elif self.dataset == DataSet.KITTI:
-            self.vis_axs[*fig_id].set_xlim(-10, 10)
+        # if self.dataset == DataSet.PARKING:
+        #     self.vis_axs[*fig_id].set_ylim(-10, 10)
+        # elif self.dataset == DataSet.KITTI:
+        #     self.vis_axs[*fig_id].set_xlim(-10, 10)
 
     def _plot_trajectory_and_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State, frame_id: int = 0):
         """

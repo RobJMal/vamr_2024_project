@@ -101,8 +101,8 @@ class PoseEstimator(BaseClass):
 
         # Converting output to world frame
         rot_matrix_wrt_camera, _ = cv2.Rodrigues(rot_vec_wrt_camera)
-        rot_matrix_wrt_world = rot_matrix_wrt_camera.T
-        trans_vec_wrt_world = -rot_matrix_wrt_world @ trans_vec_wrt_camera
+        rot_matrix_wrt_world = rot_matrix_wrt_camera # rot_matrix_wrt_camera.T
+        trans_vec_wrt_world = trans_vec_wrt_camera # -rot_matrix_wrt_world @ trans_vec_wrt_camera
 
         if ret_val:
             self._debug_print(f"Rotation Matrix (wrt world frame): {rot_matrix_wrt_world}")
