@@ -49,7 +49,7 @@ VAMR_2024_PROJECT/
 └── setup.py
 ```
 
-**Important NOTES**
+**IMPORTANT NOTES**
 - `K.txt file for PARKING dataset`: The initial formatting had problems where there were extra trailing characters. Because of this, we modified the original file so that these trailing characters are removed. The `K.txt` file are added directly into `datasets/parking/` directory. If it is overwritten, it can also be found in the `setup_files/parking/` directory. Copy this over to where the `K.txt` file should be for the PARKING dataset (`dataset/parking/`). 
 
 ## Running the pipeline
