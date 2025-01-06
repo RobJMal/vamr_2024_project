@@ -78,7 +78,7 @@ To help in the development process, we also added several command-line arguments
     - Default: `store_false`
 
 ## Video Generation and Development
-The screencasts were captured on a laptop computer with an i7 3770k processor with 4 cores @ 3.3 GHz and 16 GB RAM. The project was also tested on the following system: 
+The screencasts were captured on a laptop computer with an Apple M1 Pro processor with 16 GB RAM running macOS Sequoia 15.11. The project was also tested on the following systems: 
 
 - OS: Ubuntu 22.04          | CPU: Intel Core I7; 6 cores at @ 2.4 GHz              | RAM: 16 GB
 - OS: macOS Sonoma 14.1.1   | CPU: Intel Core I5 (8th gen); 4 cores at @ 2.3 GHz    | RAM: 8 GB
