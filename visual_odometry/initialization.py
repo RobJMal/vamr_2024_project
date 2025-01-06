@@ -97,10 +97,6 @@ class Initialization(BaseClass):
         state.X = points_3D_wrt_0[:, ~rejection_mask]
         transform = PoseEstimator.cvt_rot_trans_to_pose(np.eye(3), np.zeros((3, 1))).reshape((-1, 1)) # Convert to transform vector
 
-        # Compare the bootstrapped keypoints with the keypoints from exercise 7
-        if is_KITTI:
-            self._debug_visualize(image=image_0, title="Initial Keypoints", points=[self.get_ex7_keypoints(), inliers_0.T])
-
         self.visualize_3d(state.P, state.X, transform.reshape((4, 4)))
         self._refresh_figures()
 
