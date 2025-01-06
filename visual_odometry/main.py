@@ -60,6 +60,8 @@ class VisualOdometryPipeline(BaseClass):
         self.pose_estimator = PoseEstimator(param_server=self._param_server, debug=self.debug)
         self.landmark_triangulation = LandmarkTriangulation(param_server=self._param_server, debug=self.debug)
         self.keyframe_frequency = self.params["keyframeFreq"]
+        self.poses = []
+        self.states = []
 
         self._info_print(
             f"VO monocular pipeline initialized\n - Log level: {debug.name}\n - ParamServer: {self._param_server}")
@@ -173,7 +175,7 @@ class VisualOdometryPipeline(BaseClass):
                 "No keypoints provided for initialization for dataset other than KITTI")
         return self._get_kitti_debug_points()
 
-    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int, prev_pose: Pose) -> Tuple[State, Pose]:
+    def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int, prev_pose: Pose, dataset) -> Tuple[State, Pose]:
         # From the previous image and previous state containing keypoints and landmarks,
         # figure out which keypoints carried over in the new image and return that set of P and X
         updated_state = self.keypoint_tracker(self.K, prev_state, prev_image, curr_image)
@@ -190,7 +192,7 @@ class VisualOdometryPipeline(BaseClass):
                 # Find and triangulate new landmarks
                 updated_state = self.landmark_triangulation(self.K, curr_image, prev_image, updated_state, prev_state, pose)
 
-        self._plot_vo_vis_main(pose, updated_state, curr_image, frame_id)
+        self._plot_vo_vis_main(dataset, pose, updated_state, curr_image, frame_id)
         return updated_state, pose
 
     # region Visual Odometry main visualization methods
@@ -215,11 +217,17 @@ class VisualOdometryPipeline(BaseClass):
         Plots the trajectory of the camera wrt the world frame. Plots only the x and z coordinates since the camera
         is moving on a flat plane.
         """
+        self.vis_axs[*fig_id].clear()
+
         # Camera pose wrt world frame
         self.vis_axs[*fig_id].set_title("Full Trajectory")
-        PlotUtils._plot_trajectory(self.vis_axs[*fig_id], pose, frame_id, plot_ground_truth=True, ground_truth=self.ground_truth)
+        for i in range(len(self.poses)):
+            last_pose = True if i == len(self.poses)-1 else False
+            PlotUtils._plot_trajectory(self.vis_axs[*fig_id], self.poses[i], i, plot_ground_truth=False, ground_truth=self.ground_truth, plot_red=last_pose)
+
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
+        self.vis_axs[*fig_id].set_aspect('equal', adjustable='datalim')
 
         # if self.dataset == DataSet.PARKING:
         #     self.vis_axs[*fig_id].set_ylim(-10, 10)
@@ -231,14 +239,21 @@ class VisualOdometryPipeline(BaseClass):
         Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera
         is moving on a flat plane.
         """
-        # # Clearing the axes to show changes in landmarks
-        # self.vis_axs[*fig_id].clear()
+        # Clearing the axes to show changes in landmarks
+        self.vis_axs[*fig_id].clear()
 
-        self.vis_axs[*fig_id].set_title("Trajectory and Landmarks")
-        PlotUtils._plot_trajectory(self.vis_axs[*fig_id], pose, frame_id, plot_ground_truth=False, ground_truth=self.ground_truth)
-        PlotUtils._plot_landmarks(self.vis_axs[*fig_id], pose, state, frame_id)
+        self.vis_axs[*fig_id].set_title("Trajectory and Landmarks of last 20 frames")
+
+        num_frames_to_plot = min(20, len(self.states))
+        for i in range(1, num_frames_to_plot+1):
+            PlotUtils._plot_trajectory(self.vis_axs[*fig_id], self.poses[-i], i-1, plot_ground_truth=False, ground_truth=self.ground_truth)
+            PlotUtils._plot_landmarks(self.vis_axs[*fig_id], self.poses[-i], self.states[-i], i-1)
+
+        PlotUtils._plot_trajectory(self.vis_axs[*fig_id], self.poses[-1], i-1, plot_ground_truth=False, ground_truth=self.ground_truth, plot_red=True)
+
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
+        self.vis_axs[*fig_id].set_aspect('equal', adjustable='datalim')
 
     def _plot_keypoint_tracking_count(self, fig_id: Tuple[int, int], state: State, frame_id: int = 0):
         """
@@ -260,6 +275,7 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].plot(self.keypoint_history['frames'], self.keypoint_history['keypoints'], marker='o')
         self.vis_axs[*fig_id].set_xlabel("Frame")
         self.vis_axs[*fig_id].set_ylabel("Number of keypoints")
+        # self.vis_axs[*fig_id].set_aspect('equal')
 
     def _plot_trajectory_and_landmarks_history(self, fig_id: Tuple[int, int], pose: Pose, state: State, frame_id: int = 0):
         """
@@ -279,26 +295,37 @@ class VisualOdometryPipeline(BaseClass):
 
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
+        # self.vis_axs[*fig_id].set_aspect('equal')
 
-    def _plot_keypoints_on_frame(self, fig_id: Tuple[int, int], image, state: State):
+    def _plot_keypoints_on_frame(self, fig_id: Tuple[int, int], image, state: State, frame_id: int=0):
         """
         Plotting the keypoints on the image
         """
         self.vis_axs[*fig_id].clear()
-        self.vis_axs[*fig_id].set_title("Keypoints on Image")
+        self.vis_axs[*fig_id].set_title(f"Keypoints on Frame {frame_id}")
 
         self.vis_axs[*fig_id].imshow(image, cmap="gray")
         self.vis_axs[*fig_id].scatter(state.P[0, :], state.P[1, :], color="red", s=2)
         self.vis_axs[*fig_id].legend(["Keypoints"])
+        # self.vis_axs[*fig_id].set_aspect('equal')
 
-    def _plot_vo_vis_main(self, pose: Pose, state: State, image: np.ndarray, frame_id: int=0):
+    def _plot_vo_vis_main(self, dataset: DataSet, pose: Pose, state: State, image: np.ndarray, frame_id: int=0):
         """
         Plots all of the subplots in the main visualization.
         """
-        self._plot_keypoints_on_frame((0, 0), image, state)
+        self.poses.append(pose)
+        self.states.append(state)
+
+        self._plot_keypoints_on_frame((0, 0), image, state, frame_id)
         self._plot_keypoint_tracking_count((1, 0), state, frame_id)
         self._plot_trajectory_and_landmarks((0, 1), pose, state, frame_id)
         self._plot_full_trajectory((1, 1), pose, frame_id)
+
+        # Makes sure that plots refresh
+        self._refresh_figures()
+        time.sleep(0.01)
+
+        self.vis_figure.savefig(os.path.join(f'screencasts/{dataset.name}', f'frame_{frame_id:04d}.png'))
     # endregion
 
     # region RUN
@@ -308,7 +335,7 @@ class VisualOdometryPipeline(BaseClass):
         state, image_range, prev_image = self._init_dataset(dataset, use_bootstrap)
         prev_pose = self.world_pose
 
-        self._plot_vo_vis_main(self.world_pose, state, self.image_0, frame_id = 0)
+        self._plot_vo_vis_main(dataset, self.world_pose, state, self.image_0, frame_id = 0)
 
         ### Continuous Operation ###
         for frame_id in image_range:
@@ -328,11 +355,11 @@ class VisualOdometryPipeline(BaseClass):
                     image = np.array(cv2.imread(image_path, cv2.IMREAD_GRAYSCALE))
                     image = cv2.convertScaleAbs(image)
 
-            new_state, new_pose = self._process_frame(image, prev_image, state, frame_id, prev_pose)
+            new_state, new_pose = self._process_frame(image, prev_image, state, frame_id, prev_pose, dataset)
 
-            # Makes sure that plots refresh
-            self._refresh_figures()
-            time.sleep(0.01)
+            # # Makes sure that plots refresh
+            # self._refresh_figures()
+            # time.sleep(0.01)
 
             # Prepare for the next iteration
             prev_image = image

@@ -33,7 +33,7 @@ class PlotUtils:
         axs.quiver(t[0], t[1], t[2], z_axis[0], z_axis[1], z_axis[2], color='b', length=scale)
 
     @staticmethod
-    def _plot_trajectory(axs: Axes, pose: Pose, frame_id: int = 0, plot_ground_truth: bool = False, ground_truth: NDArray = None):
+    def _plot_trajectory(axs: Axes, pose: Pose, frame_id: int = 0, plot_ground_truth: bool = False, ground_truth: NDArray = None, plot_red: bool = False):
         """
         Plots the trajectory of the camera wrt the world frame. Plots only the x and z coordinates since the camera
         is moving on a flat plane.
@@ -46,6 +46,10 @@ class PlotUtils:
 
         # Plotting the z and x axis of the camera
         arrow_length = 0.001
+
+        if plot_red:
+            axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10, label="Current Camera Pose")
+            return
 
         if frame_id == 0:
             axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10, label="Camera Pose")
@@ -76,7 +80,7 @@ class PlotUtils:
 
         if frame_id == 0:
             # axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10, label="Pose History")
-            axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=1, label="ALL Landmarks")
+            axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=1, label="Landmarks")
         else:
             # axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
             axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=1)

@@ -5,7 +5,7 @@ main:
 
 initialization:
   # parameters for the initialization module
-  bootstrap_frames: [0, 3]
+  bootstrap_frames: [0, 4]
   outlierRejectionZThreshold: 3 # how many stddev away from the mean we want to reject outliers
 
   
