@@ -42,11 +42,10 @@ class PlotUtils:
         camera_t_wrt_world = pose[:3, 3]
         camera_rot_matrix = pose[:3, :3]
 
+        camera_t_wrt_world = -camera_rot_matrix.T @ camera_t_wrt_world
+
         # Plotting the z and x axis of the camera
         arrow_length = 0.001
-        arrow_width = 0.005
-        x_axis = camera_rot_matrix[[0, 2], 0] * arrow_length
-        z_axis = camera_rot_matrix[[0, 2], 2] * arrow_length
 
         if frame_id == 0:
             axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10, label="Camera Pose")
@@ -55,7 +54,7 @@ class PlotUtils:
             # axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], z_axis[0], z_axis[1], 
             #            color='b', label="Z Axis", width=arrow_width)
 
-            if plot_ground_truth and ground_truth is not None:
+            if ground_truth is not None and plot_ground_truth:
                 axs.scatter(ground_truth.T[0][frame_id], ground_truth.T[1][frame_id], color='blue', s=10, label="Ground Truth")
         else:
             axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10)
@@ -64,7 +63,7 @@ class PlotUtils:
             # axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], z_axis[0], z_axis[1], 
             #            color='b', width=arrow_width)
 
-            if plot_ground_truth and ground_truth is not None:
+            if ground_truth is not None and plot_ground_truth:
                 axs.scatter(ground_truth.T[0][frame_id], ground_truth.T[1][frame_id], color='blue', s=10)
 
     @staticmethod
@@ -77,10 +76,10 @@ class PlotUtils:
 
         if frame_id == 0:
             # axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10, label="Pose History")
-            axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10, label="ALL Landmarks")
+            axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=1, label="ALL Landmarks")
         else:
             # axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='red', s=10)
-            axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=10)
+            axs.scatter(landmarks_wrt_world[0, :], landmarks_wrt_world[2, :], color='green', s=1)
 
     @staticmethod
     def _convert_pixels_to_world(keypoints: State.Keypoints, pose: Pose) -> NDArray:

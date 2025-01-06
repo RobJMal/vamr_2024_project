@@ -3,11 +3,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import Tuple
 from scipy.optimize import least_squares
+from scipy.spatial.distance import cdist
 from cv2.typing import MatLike
 from numpy.typing import NDArray
 from visual_odometry.common.base_class import BaseClass
 from visual_odometry.common.enums.log_level import LogLevel
 from visual_odometry.common.params import ParamServer
+from visual_odometry.common.utils import Utils
 from visual_odometry.common.plot_utils import PlotUtils
 from visual_odometry.common.state import Pose, State
 from visual_odometry.initialization import Initialization
@@ -122,7 +124,8 @@ class LandmarkTriangulation(BaseClass):
         F_remaining = prev_state.F[:, status.ravel() == 1]
         Tau_remaining = prev_state.Tau[:, status.ravel() == 1]
 
-        _, mask = cv2.findEssentialMat(C_prev[status == 1], C_remaining, self.K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
+        _, mask = cv2.findEssentialMat(
+            C_prev[status == 1], C_remaining, self.K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
 
         C_remaining = C_remaining[mask.ravel() == 1].T
         F_remaining = F_remaining[:, mask.ravel() == 1]
@@ -177,7 +180,7 @@ class LandmarkTriangulation(BaseClass):
         return unique_candidates, unique_F, unique_Tau
 
     def _provide_new_candidate_keypoints(
-        self, curr_image: MatLike, prev_image: MatLike
+        self, curr_image: MatLike, prev_image: MatLike, prev_state: State
     ):
         """
         1. Find keypoint correspondances between the old and new images.
@@ -191,10 +194,19 @@ class LandmarkTriangulation(BaseClass):
             [kp_curr_raw[m.queryIdx].pt for m in matches], dtype=np.float32
         ).T
 
-        self._debug_print(f"Found: {new_candidates.shape[1]} new candidate keypoints")
+        # Remove candidate keypoints that are sufficiently close to existing keypoints in the state
+        if prev_state.P is not None:
+            dist = cdist(prev_state.P.T, new_candidates.T, metric="cityblock")
+            min_dist = np.min(dist, axis=0)
+            new_candidates = new_candidates[:, min_dist >
+                                            self.params["equalKeypointThreshold"]]
+
+        self._debug_print(
+            f"Found: {new_candidates.shape[1]} new candidate keypoints")
 
         if self.apply_win_thresholding:
             return self._select_n_new_keypoints(curr_image.shape, new_candidates)
+
         return new_candidates
 
     def _select_n_new_keypoints(self, img_size: Tuple[int, int], candidates: State.Keypoints):
@@ -217,9 +229,9 @@ class LandmarkTriangulation(BaseClass):
         _, idx = np.unique(np.vstack((x_id, y_id)), axis=1, return_index=True)
 
         candidates = candidates[:, idx]
-        self._debug_print(f"After windowing, new keypoints: {candidates.shape}")
+        self._debug_print(
+            f"After windowing, new keypoints: {candidates.shape}")
         return candidates
-
 
     @staticmethod
     def _inv_homo_transform(T):
@@ -245,12 +257,13 @@ class LandmarkTriangulation(BaseClass):
         error = np.linalg.norm(reprojected - C, axis=0)
 
         mask = error < self.reprojection_error_threshold
-        self._debug_print(f"Reprojection Error Mask Rejects: {np.sum(~mask)}/{mask.shape[0]} keypoints")
+        self._debug_print(
+            f"Reprojection Error Mask Rejects: {np.sum(~mask)}/{mask.shape[0]} keypoints")
 
         self._plot_reproj_error_summary((1, 0), error, mask)
         return mask
 
-    def _get_squared_sum_reprojection_error(self, x0, proj_mat_f, proj_mat_c, F, C):
+    def _get_squared_sum_reprojection_residual(self, x0, proj_mat_f, proj_mat_c, F, C):
         X = x0.reshape((3, -1))
 
         reproj_f = proj_mat_f @ np.vstack((X, np.ones(X.shape[1])))
@@ -261,41 +274,51 @@ class LandmarkTriangulation(BaseClass):
         reproj_c = reproj_c[:2, :] / reproj_c[2, :]
         res_c = np.linalg.norm(reproj_c - C, axis=0) ** 2
 
-        res_z = np.zeros_like(res_c)
+        res_z = np.zeros_like(res_c)  # Dummy
 
-        return res_c + res_f # np.hstack((res_f, res_c, res_z))
+        return res_c + res_f  # np.hstack((res_f, res_c, res_z))
 
     def _refine_triangulation_with_lm(self, proj_mat_f, proj_mat_c, F, C, X_init):
+        """
+        Improve standard SVD based triangulation with LM optimization based on the reprojection error.
+
+        This d
+        """
         # First remove points that have a high reprojection error to begin with
         x0 = X_init.reshape(-1)
 
-        # reproj_error = np.linalg.norm(self._get_squared_sum_reprojection_error(x0, proj_mat_f, proj_mat_c, F, C).reshape((3, -1)), axis=0)
-        reproj_residual = self._get_squared_sum_reprojection_error(x0, proj_mat_f, proj_mat_c, F, C)
+        # reproj_error = np.linalg.norm(self._get_squared_sum_reprojection_residual(x0, proj_mat_f, proj_mat_c, F, C).reshape((3, -1)), axis=0)
+        reproj_residual = self._get_squared_sum_reprojection_residual(
+            x0, proj_mat_f, proj_mat_c, F, C)
         filter_mask = reproj_residual < self.reprojection_error_threshold
-        self._debug_print(f"Removed outlier landmarks with high reprojection error before minimization. Using {np.sum(filter_mask)}/{X_init.shape[1]}")
+        self._debug_print(
+            f"Removed outlier landmarks with high reprojection error before minimization. Using {np.sum(filter_mask)}/{X_init.shape[1]}")
 
-        return X_init[:, filter_mask], filter_mask
+        x0 = X_init[:, filter_mask].reshape(-1)
+        F = F[:, filter_mask]
+        C = C[:, filter_mask]
 
-        # x0 = X_init[:, filter_mask].reshape(-1)
-        # F = F[:, filter_mask]
-        # C = C[:, filter_mask]
+        reproj_error = np.linalg.norm(self._get_squared_sum_reprojection_residual(
+            x0, proj_mat_f, proj_mat_c, F, C), ord=1)
+        self._debug_print(
+            f"Reprojection Error before minimization {reproj_error}")
+        out_x = least_squares(self._get_squared_sum_reprojection_residual, x0, args=(
+            proj_mat_f, proj_mat_c, F, C), method='trf')
+        reproj_error = np.linalg.norm(self._get_squared_sum_reprojection_residual(
+            out_x.x, proj_mat_f, proj_mat_c, F, C), ord=1)
+        self._debug_print(
+            f"Reprojection Error after minimization {reproj_error}")
+        X_refined = out_x.x.reshape((3, -1))
 
-        # reproj_error = np.linalg.norm(self._get_squared_sum_reprojection_error(x0, proj_mat_f, proj_mat_c, F, C), ord=1)
-        # self._debug_print(f"Reprojection Error before minimization {reproj_error}")
-        # out_x = least_squares(self._get_squared_sum_reprojection_error, x0, args=(proj_mat_f, proj_mat_c, F, C), method='trf')
-        # reproj_error = np.linalg.norm(self._get_squared_sum_reprojection_error(out_x.x, proj_mat_f, proj_mat_c, F, C), ord=1)
-        # self._debug_print(f"Reprojection Error after minimization {reproj_error}")
-        # X_refined = out_x.x.reshape((3, -1))
+        X_init[:, ~filter_mask] = 0
+        X_init[:, filter_mask] = X_refined
 
-        # X_init[:, ~filter_mask] = 0
-        # X_init[:, filter_mask] = X_refined
-
-        # return X_refined, filter_mask
+        return X_refined, filter_mask
 
     def _get_landmarks_for_keypoints(
         self,
         K: NDArray,
-        X_curr: State.Landmarks,
+        updated_state: State,
         C: State.Keypoints,
         F: State.Keypoints,
         Tau: State.PoseVectors,
@@ -318,24 +341,11 @@ class LandmarkTriangulation(BaseClass):
         angles = np.zeros(C.shape[1], dtype=np.float32)
         angles[:] = np.nan
 
-        unique_Tau, indx, inverse_indices = np.unique(Tau, return_index=True, return_inverse=True, axis=1)
-
-        # Create groups by unique Tau values
-        grouped_indices = np.split(np.argsort(inverse_indices), np.unique(np.sort(inverse_indices), return_index=True)[1])
-
-        # for cnt, (cs, fs, taus) in enumerate(zip(C.T, F.T, Tau.T)):
-        #     group_idx = np.array([cnt])
-        #     taus = taus[:, None]
-        #     fs = fs[:, None]
-        #     cs = cs[:, None]
-        for group_cnt, group_idx in enumerate(grouped_indices):
-            if group_idx.size == 0:
-                continue
-            cs = C[:, group_idx]
-            fs = F[:, group_idx]
-            taus = np.unique(Tau[:, group_idx], axis=1)
-
-            assert taus.shape[1] == 1, "something went wrong with the whole unique tau shabang"
+        for cnt, (cs, fs, taus) in enumerate(zip(C.T, F.T, Tau.T)):
+            group_idx = np.array([cnt])
+            taus = taus[:, None]
+            fs = fs[:, None]
+            cs = cs[:, None]
 
             tau: NDArray = taus.reshape((4, 4))
             proj_mat_f: NDArray = K @ tau[:3, :]
@@ -345,8 +355,10 @@ class LandmarkTriangulation(BaseClass):
             )
             pXs_C_wrt_w = pXs_C_wrt_w_4D[:3, :] / pXs_C_wrt_w_4D[3, :]
             # These are multiple landmarks triangulated from the same pose
-            pXs_C_wrt_f = tau @ np.vstack((pXs_C_wrt_w, np.ones(pXs_C_wrt_w.shape[1])))
-            pXs_C_wrt_c = curr_pose @ np.vstack((pXs_C_wrt_w, np.ones(pXs_C_wrt_w.shape[1])))
+            pXs_C_wrt_f = tau @ np.vstack((pXs_C_wrt_w,
+                                          np.ones(pXs_C_wrt_w.shape[1])))
+            pXs_C_wrt_c = curr_pose @ np.vstack(
+                (pXs_C_wrt_w, np.ones(pXs_C_wrt_w.shape[1])))
 
             rear_triangulated_pts = (pXs_C_wrt_f[2] < 0) | (pXs_C_wrt_c[2] < 0)
             pXs_C_wrt_w = pXs_C_wrt_w[:, ~rear_triangulated_pts]
@@ -355,70 +367,50 @@ class LandmarkTriangulation(BaseClass):
             if pXs_C_wrt_w.size == 0:
                 continue
 
-            pXs_C_wrt_w, accepted_pts = self._refine_triangulation_with_lm(proj_mat_f, proj_mat_curr, fs[:, ~rear_triangulated_pts], cs[:, ~rear_triangulated_pts], pXs_C_wrt_w)
-            if accepted_pts.size == 0:
-                continue
-            group_idx = group_idx[accepted_pts]
-            # These are multiple landmarks triangulated from the same pose
-            pXs_C_wrt_f = tau @ np.vstack((pXs_C_wrt_w, np.ones(pXs_C_wrt_w.shape[1])))
-            pXs_C_wrt_c = curr_pose @ np.vstack((pXs_C_wrt_w, np.ones(pXs_C_wrt_w.shape[1])))
-            dot_products = np.sum(np.multiply(pXs_C_wrt_f, pXs_C_wrt_c), axis=0)
+            # pXs_C_wrt_w, accepted_pts = self._refine_triangulation_with_lm(
+            #     proj_mat_f, proj_mat_curr, fs[:, ~rear_triangulated_pts], cs[:, ~rear_triangulated_pts], pXs_C_wrt_w)
+            # if accepted_pts.size == 0:
+            #     continue
+            # group_idx = group_idx[accepted_pts]
+
+            pXs_C_wrt_f = tau @ np.vstack((pXs_C_wrt_w,
+                                          np.ones(pXs_C_wrt_w.shape[1])))
+            pXs_C_wrt_c = curr_pose @ np.vstack(
+                (pXs_C_wrt_w, np.ones(pXs_C_wrt_w.shape[1])))
+            dot_products = np.sum(np.multiply(
+                pXs_C_wrt_f, pXs_C_wrt_c), axis=0)
             alpha = np.arccos(
                 dot_products
                 / (np.linalg.norm(pXs_C_wrt_c, axis=0) * np.linalg.norm(pXs_C_wrt_f, axis=0))
             )
-            assert np.all(np.isnan(angles[group_idx])), "Overwriting Initialized Angles"
+            assert np.all(np.isnan(angles[group_idx])
+                          ), "Overwriting Initialized Angles"
             angles[group_idx] = alpha
             points_world[:, group_idx] = pXs_C_wrt_w
 
+        X_curr_camera = Utils.homogenous_mat_mult(curr_pose, updated_state.X)
+        points_camera = Utils.homogenous_mat_mult(curr_pose, points_world)
+        outlier_rejection_mask = self._get_outlier_rejection_mask(
+            X_curr_camera, points_camera, self.params["outlierRejectionZThreshold"])
+        points_world[:, outlier_rejection_mask] = 0
+        angles[outlier_rejection_mask] = 0
 
-
-        # for cnt, (c, f, tau) in enumerate(zip(C.T, F.T, Tau.T)):
-        #     tau: NDArray = tau.reshape((4, 4))
-        #     proj_mat_f: NDArray = K @ tau[:3, :]
-
-        #     pX_C_wrt_w_4D: NDArray = cv2.triangulatePoints(
-        #         proj_mat_f, proj_mat_curr, f, c
-        #     )
-        #     pX_C_wrt_w = pX_C_wrt_w_4D[:3, :] / pX_C_wrt_w_4D[3, :]
-        #     pX_C_wrt_f = tau @ np.vstack((pX_C_wrt_w, np.ones(1)))
-        #     pX_C_wrt_c = curr_pose @ np.vstack((pX_C_wrt_w, np.ones(1)))
-
-        #     # Possible improvement: Reproject and reject to clean up further
-        #     if pX_C_wrt_f[2] < 0 or pX_C_wrt_c[2] < 0:
-        #         continue
-
-        #     alpha = np.arccos(
-        #         pX_C_wrt_c.T
-        #         @ pX_C_wrt_f
-        #         / (np.linalg.norm(pX_C_wrt_c) * np.linalg.norm(pX_C_wrt_f))
-        #     )
-        #     if np.isnan(alpha):
-        #         continue
-        #     angles[cnt] = alpha
-        #     points_world[:, cnt] = pX_C_wrt_w.ravel()
-
-        # points_camera = curr_pose @ np.vstack((points_world, np.ones(points_world.shape[1])))
-        # points_camera = points_camera[:3, :] / points_camera[3, :]
-
-        # points_mask = self._remove_outlier_mask(X_curr, points_camera, np.ones(points_camera.shape[1], dtype=bool), axis=2, threshold=3.0)
-        # points_mask = self._remove_outlier_mask(X_curr, points_camera, points_mask, axis=0, threshold=1.2)
-
-        # self._debug_print(f"After removing outliers in the X and Z axis, we have {np.sum(points_mask)}/{points_world.shape[1]} landmarks available")
-
-        # points_world[:, ~points_mask] = 0
-        # angles[~points_mask] = 0
+        self._debug_print(
+            f"After removing outliers in the X and Z axis, we have {np.sum(outlier_rejection_mask)}/{points_world.shape[1]} landmarks available")
 
         self._plot_keypoints_and_landmarks(
             (1, 1), curr_pose, C, points_world, candidates=True, clear=False
         )
 
         angles[np.isnan(angles)] = 0.0
-        self._info_print(f"Angles: max: {np.max(angles)}, min: {np.min(angles)}")
+        self._info_print(
+            f"Angles: max: {np.max(angles)}, min: {np.min(angles)}")
         eligible_keypoint_mask = angles > self.landmark_angle_threshold
-        # reprojection_error_mask = self._get_reprojection_error_mask(C, proj_mat_curr, points_world)
 
-        selection_mask = eligible_keypoint_mask # & reprojection_error_mask
+        reprojection_error_mask = self._get_reprojection_error_mask(
+            C, proj_mat_curr, points_world)
+
+        selection_mask = eligible_keypoint_mask & reprojection_error_mask
 
         P_new = C[:, selection_mask]
         X_new = points_world[:, selection_mask]
@@ -427,6 +419,22 @@ class LandmarkTriangulation(BaseClass):
         F_remain = F[:, ~selection_mask]
         Tau_remain = Tau[:, ~selection_mask]
 
+        # rank the remaining candidates based on dist from existing and angle
+        angle_rank = np.argsort(angles[selection_mask])
+        distance_rank = np.argsort(
+            np.mean(cdist(updated_state.P.T, P_new.T, metric="cityblock")))
+
+        num_kp_to_add = max(
+            0, self.params["maxNumLandmarks"] - updated_state.P.shape[1])
+
+        num_kp_to_add = np.clip(num_kp_to_add, None,
+                                self.params["limitNewLandmarks"])
+
+        rank = np.argsort(
+            angle_rank + distance_rank)[:num_kp_to_add]
+
+        P_new = P_new[:, rank]
+        X_new = X_new[:, rank]
 
         self._info_print(
             f"Found {np.sum(eligible_keypoint_mask)} new landmarks to add to the queue. {np.sum(~eligible_keypoint_mask)} candidates remain."
@@ -434,56 +442,53 @@ class LandmarkTriangulation(BaseClass):
 
         return P_new, X_new, C_remain, F_remain, Tau_remain
 
-    def _remove_outlier_mask(self, X_curr, X_new, mask, axis, threshold):
+    @staticmethod
+    def _get_outlier_rejection_mask(X_curr, X_new, threshold):
         """
-        Given the current selection of new landmarks, don't add ones that are a threshold pct away on the Z axis
-        from the mean X_curr
+        From a set of landmarks, X_new;
+        Remove outliers based on a stddev threshold from statistics of the current landmarks X_curr
         """
-        data = X_new[axis, mask]
-        if data.size == 0:
-            return mask
+        mean = np.mean(X_curr, axis=1)[:, None]
+        stddev = np.std(X_curr, axis=1)[:, None]
 
-        farthest_curr_X = np.median(X_curr[axis, :])
-        limit = threshold * farthest_curr_X
+        zscore_all_dim = np.abs((X_new - mean) / stddev)
+        zscore_avg = np.average(zscore_all_dim, axis=0)
 
-        threshold_mask = np.abs(data) < limit
-
-        # STD DEV METHOD
-        # mean = np.mean(data)
-        # std_dev = np.std(data)
-        # threshold_mask = (data > (mean - (threshold * std_dev))) & (data < (mean + (threshold * std_dev)))
-
-        updated_mask = np.zeros_like(mask, dtype=bool)
-        updated_mask[mask] = threshold_mask
-        return updated_mask
+        reject_mask = zscore_avg > threshold
+        return reject_mask
 
     @BaseClass.plot_debug
     def _plot_reproj_error_summary(self, fig_id: Tuple[int, int], error, mask):
         x_ax = np.arange(error.shape[0])
-        self.vis_axs[*fig_id].scatter(x_ax[mask], error[mask], color="Green", label=f"Accepted: {np.sum(mask)}", alpha=0.1)
-        self.vis_axs[*fig_id].scatter(x_ax[~mask], error[~mask], color="Red", label=f"Rejected: {np.sum(~mask)}", alpha=0.1)
+        self.vis_axs[*fig_id].scatter(x_ax[mask], error[mask],
+                                      color="Green", label=f"Accepted: {np.sum(mask)}", alpha=0.1)
+        self.vis_axs[*fig_id].scatter(x_ax[~mask], error[~mask],
+                                      color="Red", label=f"Rejected: {np.sum(~mask)}", alpha=0.1)
         self.vis_axs[*fig_id].set_title("Reprojection Error")
-
 
     def perform_triangulation(
         self,
         K: NDArray,
         curr_image: MatLike,
         prev_image: MatLike,
+        updated_state: State,
         prev_state: State,
         curr_pose: Pose,
     ):
         if prev_state.C.size == 0:
             # Empty the first time
-            new_candidates = self._provide_new_candidate_keypoints(curr_image, prev_image)
+            new_candidates = self._provide_new_candidate_keypoints(
+                curr_image, prev_image, prev_state)
             C_new, F_new, Tau_new = self._remove_duplicate_candidates_and_add_F_and_Tau(
-                np.empty((2, 0)), new_candidates, np.empty((2, 0)), np.empty((16, 0)), curr_pose
+                np.empty((2, 0)), new_candidates, np.empty(
+                    (2, 0)), np.empty((16, 0)), curr_pose
             )
 
             return np.empty((2, 0)), np.empty((3, 0)), C_new, F_new, Tau_new
 
         # Filter Lost Candidates First
-        self._debug_print(f"Prev state number of candidates: {prev_state.C.shape[1]}")
+        self._debug_print(
+            f"Prev state number of candidates: {prev_state.C.shape[1]}")
         C_filtered, F_filtered, Tau_filtered = self._filter_lost_candidate_keypoints(
             curr_image, prev_image, prev_state
         )
@@ -491,7 +496,7 @@ class LandmarkTriangulation(BaseClass):
         # Triangulate the points from the current candidates and evaluate the ones to Remove
         P_new, X_new, C_remain, F_remain, Tau_remain = (
             self._get_landmarks_for_keypoints(
-                K, prev_state.X, C_filtered, F_filtered, Tau_filtered, curr_pose
+                K, updated_state, C_filtered, F_filtered, Tau_filtered, curr_pose
             )
         )
 
@@ -503,7 +508,8 @@ class LandmarkTriangulation(BaseClass):
             label="Current Image",
             title="Evaluated Candidates",
         )
-        new_candidates = self._provide_new_candidate_keypoints(curr_image, prev_image)
+        new_candidates = self._provide_new_candidate_keypoints(
+            curr_image, prev_image, prev_state)
         C_new, F_new, Tau_new = self._remove_duplicate_candidates_and_add_F_and_Tau(
             C_remain, new_candidates, F_remain, Tau_remain, curr_pose
         )
@@ -526,6 +532,7 @@ class LandmarkTriangulation(BaseClass):
             2. Track them for some length. The keypoints that have been tracked for that much time or more have to be popped for analysis I guess...?
             3.
         """
+
         self._clear_figures()
         # self.viz_curr_and_prev_img(curr_image, prev_image)
         self.K = K
@@ -540,7 +547,7 @@ class LandmarkTriangulation(BaseClass):
         )
 
         P_new, X_new, C_new, F_new, Tau_new = self.perform_triangulation(
-            K, curr_image, prev_image, prev_state, curr_pose
+            K, curr_image, prev_image, updated_state, prev_state, curr_pose
         )
 
         updated_state.P = np.hstack((updated_state.P, P_new))
@@ -555,22 +562,22 @@ class LandmarkTriangulation(BaseClass):
 
         return updated_state
 
-    @checkIter
+    @ checkIter
     def get_axs(self, *args, **kwargs):
         if "forcePlot" in kwargs:
             del kwargs["forcePlot"]
         return super().get_axs(*args, **kwargs)
 
-    @BaseClass.plot_debug
-    @checkIter
+    @ BaseClass.plot_debug
+    @ checkIter
     def viz_curr_and_prev_img(self, curr_image, prev_image) -> None:
         self.vis_axs[0, 0].imshow(prev_image)
         self.vis_axs[0, 0].set_title("Previous Image")
         self.vis_axs[0, 1].imshow(curr_image)
         self.vis_axs[0, 1].set_title("Current Image")
 
-    @BaseClass.plot_debug
-    @checkIter
+    @ BaseClass.plot_debug
+    @ checkIter
     def viz_image(
         self,
         fig_idx: Tuple[int, int],
@@ -584,8 +591,8 @@ class LandmarkTriangulation(BaseClass):
         if title:
             self.vis_axs[*fig_idx].set_title(title)
 
-    @BaseClass.plot_debug
-    @checkIter
+    @ BaseClass.plot_debug
+    @ checkIter
     def viz_keypoints(
         self, fig_idx: Tuple[int, int], kps: NDArray, color: str, label: str, **kwargs
     ):
@@ -600,8 +607,8 @@ class LandmarkTriangulation(BaseClass):
             **kwargs,
         )
 
-    @BaseClass.plot_debug
-    @checkIter
+    @ BaseClass.plot_debug
+    @ checkIter
     def viz_kp_difference(
         self,
         fig_idx: Tuple[int, int],

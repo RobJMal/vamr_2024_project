@@ -5,7 +5,8 @@ main:
 
 initialization:
   # parameters for the initialization module
-  bootstrap_frames: [0, 2]
+  bootstrap_frames: [0, 3]
+  outlierRejectionZThreshold: 3 # how many stddev away from the mean we want to reject outliers
 
   
 # module: keypoint_tracker
@@ -35,8 +36,12 @@ landmark_triangulation:
   # min_inliers: 10 # minimum number of inliers to track
   criteria_eps: 0.01 # treshold for the Lucas-Kanade tracker
   criteria_count: 10 # number of iterations for the Lucas-Kanade tracker
-  landmarkAngleThreshold: 0.26 # radians # 15 degrees
+  landmarkAngleThreshold: 0.00174533 # radians # 0.1 degrees
   maxNewKeypointsPerIter: 100 # Create n windows and select one point from this. Must be a square number since we use windowing to achieve this
   applyWindowThresholding: false
   reprojectionErrorThreshold: 2.0 # pixel distance
-  applyReprojectionErrorRejection: true
+  applyReprojectionErrorRejection: false
+  outlierRejectionZThreshold: 3 # how many stddev away from the mean we want to reject outliers
+  equalKeypointThreshold: 8.0 # num_pixels manhatten radius around a newly detected keypoint to be considered the same as an existing keypoint
+  maxNumLandmarks: 500
+  limitNewLandmarks: 100

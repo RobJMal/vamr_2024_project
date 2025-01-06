@@ -16,6 +16,18 @@
             "justMyCode": true
         },
         {
+            "name": "Run Pipeline - KITTI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/visual_odometry/main.py",
+            "args": [
+                "--dataset",
+                "KITTI"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Run Pipeline - PARKING, Visualization",
             "type": "debugpy",
             "request": "launch",
