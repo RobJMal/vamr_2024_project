@@ -50,19 +50,19 @@ class PlotUtils:
 
         if frame_id == 0:
             axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10, label="Camera Pose")
-            axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], x_axis[0], x_axis[1], 
-                       color='r', label="X Axis", width=arrow_width)
-            axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], z_axis[0], z_axis[1], 
-                       color='b', label="Z Axis", width=arrow_width)
+            # axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], x_axis[0], x_axis[1], 
+            #            color='r', label="X Axis", width=arrow_width)
+            # axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], z_axis[0], z_axis[1], 
+            #            color='b', label="Z Axis", width=arrow_width)
 
             if plot_ground_truth:
                 axs.scatter(ground_truth.T[0][frame_id], ground_truth.T[1][frame_id], color='blue', s=10, label="Ground Truth")
         else:
             axs.scatter(camera_t_wrt_world[0], camera_t_wrt_world[2], color='black', s=10)
-            axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], x_axis[0], x_axis[1], 
-                       color='r', width=arrow_width)
-            axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], z_axis[0], z_axis[1], 
-                       color='b', width=arrow_width)
+            # axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], x_axis[0], x_axis[1], 
+            #            color='r', width=arrow_width)
+            # axs.quiver(camera_t_wrt_world[0], camera_t_wrt_world[2], z_axis[0], z_axis[1], 
+            #            color='b', width=arrow_width)
 
             if plot_ground_truth:
                 axs.scatter(ground_truth.T[0][frame_id], ground_truth.T[1][frame_id], color='blue', s=10)
