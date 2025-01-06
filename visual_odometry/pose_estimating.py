@@ -68,7 +68,7 @@ class PoseEstimator(BaseClass):
             confidence=self.params["pnp_ransac_confidence"]
         )
 
-        self._plot_pose_and_landmarks((0, 0), init_pose, state, plot_title="Pose and Landmarks")
+        # self._plot_pose_and_landmarks((0, 0), init_pose, state, plot_title="Pose and Landmarks")
 
         # Applying nonlinear optimization using inliers 
         if self.params["use_reprojection_error_optimization"]:
@@ -96,6 +96,7 @@ class PoseEstimator(BaseClass):
                 pose_estimation_with_inliers = self.cvt_rot_trans_to_pose(rot_matrix_wrt_world_vis, trans_vector_wrt_world_vis)
 
                 self._plot_pose_and_landmarks((0, 1), pose_estimation_with_inliers, state_inliers, plot_title="Pose and Landmarks (using Inliers)")
+                self._plot_inliers_percentage_history((1, 0), state, state_inliers, frame_id=frame_id)
                 self._plot_num_inliers_history((1, 1), state, frame_id=frame_id)
 
         # Converting output to world frame
@@ -135,6 +136,31 @@ class PoseEstimator(BaseClass):
         self.vis_axs[*fig_id].legend()
         self.vis_axs[*fig_id].set_xlabel("X")
         self.vis_axs[*fig_id].set_ylabel("Z")
+
+    @BaseClass.plot_debug
+    def _plot_inliers_percentage_history(self, fig_id: Tuple[int, int], state: State, state_inliers: State, frame_id: int = 0):
+        """
+        Plots the number of inliers over time.
+        """
+        # Maintain history of frames and keypoint counts. This is 
+        # enable us to plot the history of keypoints tracked as a line
+        if not hasattr(self, 'inlier_percentage_history'):
+            self.inlier_percentage_history = {'frames': [], 'total_state': [], 'inliers': [], 'inliers_percentage': []}
+
+        # Append current frame and keypoint count to the history. 
+        self.inlier_percentage_history['frames'].append(frame_id)
+        self.inlier_percentage_history['total_state'].append(state.P.shape[1])
+        self.inlier_percentage_history['inliers'].append(state_inliers.P.shape[1])
+        self.inlier_percentage_history['inliers_percentage'].append(state_inliers.P.shape[1] / state.P.shape[1])
+
+        # Clear the axis for fresh plotting
+        self.vis_axs[*fig_id].clear()
+
+        self.vis_axs[*fig_id].set_title("Inlier Tracking Count")
+        self.vis_axs[*fig_id].plot(self.inlier_percentage_history['frames'], self.inlier_percentage_history['inliers_percentage'], marker='o')
+
+        self.vis_axs[*fig_id].set_xlabel("Frame")
+        self.vis_axs[*fig_id].set_ylabel("Percentage of inliers")
 
     @BaseClass.plot_debug
     def _plot_num_inliers_history(self, fig_id: Tuple[int, int], state: State, frame_id: int = 0):
