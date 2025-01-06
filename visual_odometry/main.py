@@ -124,58 +124,57 @@ class VisualOdometryPipeline(BaseClass):
         self.dataset = dataset
 
         #  Bootstrap
-        if use_bootstrap:
-            self._info_print("Using bootstrapping to find initial keypoints")
-            bootstrap_frames = self._param_server["initialization"]["bootstrap_frames"]
-            if dataset == DataSet.KITTI:
-                img0_path = os.path.join(
-                    self._dataset_paths["KITTI"], '05/image_0', f'{bootstrap_frames[0]:06d}.png')
-                img1_path = os.path.join(
-                    self._dataset_paths["KITTI"], '05/image_0', f'{bootstrap_frames[1]:06d}.png')
+        self._info_print("Using bootstrapping to find initial keypoints")
+        bootstrap_frames = self._param_server["initialization"]["bootstrap_frames"]
+        if dataset == DataSet.KITTI:
+            img0_path = os.path.join(
+                self._dataset_paths["KITTI"], '05/image_0', f'{bootstrap_frames[0]:06d}.png')
+            img1_path = os.path.join(
+                self._dataset_paths["KITTI"], '05/image_0', f'{bootstrap_frames[1]:06d}.png')
 
-                img0 = np.array(cv2.imread(img0_path, cv2.IMREAD_GRAYSCALE))
-                img1 = np.array(cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE))
-            elif dataset == DataSet.MALAGA:
-                if self.left_images is None:
-                    raise ValueError("No left_images variable available for MALAGA dataset")
-                img0_path = os.path.join(
-                    self._dataset_paths["MALAGA"], 'malaga-urban-dataset-extract-07_rectified_800x600_Images', self.left_images[bootstrap_frames[0]])
-                img1_path = os.path.join(
-                    self._dataset_paths["MALAGA"], 'malaga-urban-dataset-extract-07_rectified_800x600_Images', self.left_images[bootstrap_frames[1]])
+            img0 = np.array(cv2.imread(img0_path, cv2.IMREAD_GRAYSCALE))
+            img1 = np.array(cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE))
+        elif dataset == DataSet.MALAGA:
+            if self.left_images is None:
+                raise ValueError("No left_images variable available for MALAGA dataset")
+            img0_path = os.path.join(
+                self._dataset_paths["MALAGA"], 'malaga-urban-dataset-extract-07_rectified_800x600_Images', self.left_images[bootstrap_frames[0]])
+            img1_path = os.path.join(
+                self._dataset_paths["MALAGA"], 'malaga-urban-dataset-extract-07_rectified_800x600_Images', self.left_images[bootstrap_frames[1]])
 
-                img0 = np.array(cv2.imread(img0_path, cv2.IMREAD_GRAYSCALE))
-                img1 = np.array(cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE))
-            elif dataset == DataSet.PARKING:
-                img0_path = os.path.join(
-                    self._dataset_paths["PARKING"], 'images', f'img_{bootstrap_frames[0]:05d}.png')
-                img1_path = os.path.join(
-                    self._dataset_paths["PARKING"], 'images', f'img_{bootstrap_frames[1]:05d}.png')
+            img0 = np.array(cv2.imread(img0_path, cv2.IMREAD_GRAYSCALE))
+            img1 = np.array(cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE))
+        elif dataset == DataSet.PARKING:
+            img0_path = os.path.join(
+                self._dataset_paths["PARKING"], 'images', f'img_{bootstrap_frames[0]:05d}.png')
+            img1_path = os.path.join(
+                self._dataset_paths["PARKING"], 'images', f'img_{bootstrap_frames[1]:05d}.png')
 
-                img0 = np.array(cv2.convertScaleAbs(
-                    cv2.imread(img0_path, cv2.IMREAD_GRAYSCALE)))
-                img1 = np.array(cv2.convertScaleAbs(
-                    cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE)))
-            else:
-                raise AssertionError("Invalid dataset selection")
+            img0 = np.array(cv2.convertScaleAbs(
+                cv2.imread(img0_path, cv2.IMREAD_GRAYSCALE)))
+            img1 = np.array(cv2.convertScaleAbs(
+                cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE)))
+        else:
+            raise AssertionError("Invalid dataset selection")
 
-            self.image_0 = img0
+        self.image_0 = img0
 
-            # setup for continuous operation
-            state = self.initialization(img0, img1, self.K, dataset == DataSet.KITTI)
-            self.world_pose: NDArray = np.block([[np.eye(3), np.zeros((3, 1))],
-                                                 [ 0, 0, 0, 1 ]])
-            from_index = bootstrap_frames[1] + 1
-            to_index = self.last_frame + 1
-            prev_img = img1
+        # setup for continuous operation
+        state = self.initialization(img0, img1, self.K, dataset == DataSet.KITTI)
+        self.world_pose: NDArray = np.block([[np.eye(3), np.zeros((3, 1))],
+                                                [ 0, 0, 0, 1 ]])
+        from_index = bootstrap_frames[1] + 1
+        to_index = self.last_frame + 1
+        prev_img = img1
 
-            return state, range(from_index, to_index), prev_img
+        return state, range(from_index, to_index), prev_img
 
-        # do not use bootstrap, initialize with first frame and given keypoints
-        self._info_print("No bootstrapping, using provided keypoints")
-        if dataset != DataSet.KITTI:
-            raise AssertionError(
-                "No keypoints provided for initialization for dataset other than KITTI")
-        return self._get_kitti_debug_points()
+        # # do not use bootstrap, initialize with first frame and given keypoints
+        # self._info_print("No bootstrapping, using provided keypoints")
+        # if dataset != DataSet.KITTI:
+        #     raise AssertionError(
+        #         "No keypoints provided for initialization for dataset other than KITTI")
+        # return self._get_kitti_debug_points()
 
     def _process_frame(self, curr_image: MatLike, prev_image: MatLike, prev_state: State, frame_id: int, prev_pose: Pose, dataset) -> Tuple[State, Pose]:
         # From the previous image and previous state containing keypoints and landmarks,
