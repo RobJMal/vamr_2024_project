@@ -73,7 +73,7 @@ class PoseEstimator(BaseClass):
             distCoeffs=distortion_matrix, 
             rvec=init_rot_vec_wrt_camera,
             tvec=init_trans_vec_wrt_camera,
-            useExtrinsicGuess=True,
+            useExtrinsicGuess=False,
             iterationsCount=self.params["pnp_ransac_iterations"],
             reprojectionError=self.params["pnp_ransac_reprojection_error"],
             confidence=self.params["pnp_ransac_confidence"]
@@ -81,13 +81,13 @@ class PoseEstimator(BaseClass):
 
         self._plot_pose_and_landmarks((0, 0), init_pose, state, plot_title="Pose and Landmarks")
 
-        # Extracting inliers
-        landmarks_inliers = state.X[:, inliers.flatten()]
-        keypoints_inliers = state.P[:, inliers.flatten()]
-        state_inliers = State(keypoints_inliers, landmarks_inliers)
-
         # Applying nonlinear optimization using inliers 
         if self.params["use_reprojection_error_optimization"]:
+            # Extracting inliers
+            landmarks_inliers = state.X[:, inliers.flatten()]
+            keypoints_inliers = state.P[:, inliers.flatten()]
+            state_inliers = State(keypoints_inliers, landmarks_inliers)
+
             rot_vec_wrt_camera, trans_vec_wrt_camera = cv2.solvePnPRefineLM(
                 objectPoints=landmarks_inliers.T, 
                 imagePoints=keypoints_inliers.T, 
