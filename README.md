@@ -36,10 +36,10 @@ VAMR_2024_PROJECT/
 │   │   └── poses/
 |   ├── malaga-urban-dataset-extract-07/
 |   |   ├── ...
-│   ├── parking/
-│   │   ├── images/
-│   │   ├── K.txt
-│   │   └── poses.txt
+│   └── parking/
+│       ├── images/
+│       ├── K.txt
+│       └── poses.txt
 ├── setup_files/
 │   └── parking/
 |       └── K.txt
