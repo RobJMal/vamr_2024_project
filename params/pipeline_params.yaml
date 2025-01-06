@@ -21,9 +21,9 @@ keypoint_tracker:
 pose_estimator:
   # parameters for the solvePnPRansac function (https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html#ga50620f0e26e02caa2e9adc07b5fbf24e)
   use_extrinsic_guess: false                  # Using provided estimated rvec and tvec values for approximation (default: false)
-  pnp_ransac_iterations: 100                  # Number of iterations (default: 100)
-  pnp_ransac_reprojection_error: 8.0          # Inlier threshold used by RANSAC (default: 8.0)
-  pnp_ransac_confidence: 0.99                 # Probability that algorithm produces a useful result (default: 0.99)
+  pnp_ransac_iterations: 1000                  # Number of iterations (default: 100)
+  pnp_ransac_reprojection_error: 4.0          # Inlier threshold used by RANSAC (default: 8.0)
+  pnp_ransac_confidence: 0.9999                 # Probability that algorithm produces a useful result (default: 0.99)
   use_reprojection_error_optimization: true
 
 # module: landmark_triangulation
