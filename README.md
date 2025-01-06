@@ -1,14 +1,5 @@
-# vamr_2024_project
-Final project for Vision Algorithms for Mobile Robotics (VAMR) Fall 2024.
-
-## Video Generation and Development
-The screencasts were captured on a laptop computer with an i7 3770k processor with 4 cores @ 3.3 GHz and 16 GB RAM. The project was also tested on the following system: 
-
-- OS: Ubuntu 22.04          | CPU: Intel Core I7; 6 cores at @ 2.4 GHz              | RAM: 16 GB
-- OS: macOS Sonoma 14.1.1   | CPU: Intel Core I5 (8th gen); 4 cores at @ 2.3 GHz    | RAM: 8 GB
-- OS: macOS Sequoia 15      | CPU: Apple M2 Chip; 8 cores @ 2.42 GHz                | RAM: 16 GB
-
-It should be noted that the pipeline is single-threaded. 
+# Monocular Vision Odometry (VO) Pipeline
+Final mini-project for ETH/UZH course Vision Algorithms for Mobile Robotics (VAMR) Fall 2024.
 
 ## Setup
 The setup process for our repository is separated into two steps: 
@@ -17,13 +8,13 @@ The setup process for our repository is separated into two steps:
 
 ### Environment setup 
 To create a conda environment with all of the dependencies and Python version, run the following commands. Because the visual odometry pipeline we created is a Python package, it will need to be installed as one, hence the second commands:
-```
+```bash
 conda env create -f environment.yml
 pip install -e .
 ```
 
 Alternatively, install the package dependencies direclty using pip install. Note that your Python version should be 3.12 or greater:
-```
+```bash
 pip install -r requirements.txt
 pip install -e .
 ```
@@ -59,8 +50,8 @@ VAMR_2024_PROJECT/
 ```
 
 ## Running the pipeline
-To run the VO pipeline, you would run the following:
-```
+To run the VO pipeline, you would run one of the following commands:
+```bash
 python visual_odometry/main.py --dataset PARKING    # Runs pipeline with PARKING dataset
 python visual_odometry/main.py --dataset KITTI      # Runs pipeline with KITTI dataset
 python visual_odometry/main.py --dataset MALAGA     # Runs pipeline with MALAGA dataset
@@ -86,4 +77,12 @@ To help in the development process, we also added several command-line arguments
     - Description: Do not use bootstrap, initialize based on given keypoints
     - Default: `store_false`
 
+## Video Generation and Development
+The screencasts were captured on a laptop computer with an i7 3770k processor with 4 cores @ 3.3 GHz and 16 GB RAM. The project was also tested on the following system: 
+
+- OS: Ubuntu 22.04          | CPU: Intel Core I7; 6 cores at @ 2.4 GHz              | RAM: 16 GB
+- OS: macOS Sonoma 14.1.1   | CPU: Intel Core I5 (8th gen); 4 cores at @ 2.3 GHz    | RAM: 8 GB
+- OS: macOS Sequoia 15      | CPU: Apple M2 Chip; 8 cores @ 2.42 GHz                | RAM: 16 GB
+
+It should be noted that the pipeline is single-threaded. 
 
