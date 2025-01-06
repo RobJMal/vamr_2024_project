@@ -66,6 +66,7 @@ class VisualOdometryPipeline(BaseClass):
 
     def _get_dataset_metadata(self, dataset: DataSet) -> None:
         # Setup
+        self.ground_truth = None
         match dataset:
             case DataSet.KITTI:
                 ground_truth = np.loadtxt(
@@ -230,11 +231,11 @@ class VisualOdometryPipeline(BaseClass):
         Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera
         is moving on a flat plane.
         """
-        # Clearing the axes to show changes in landmarks
-        self.vis_axs[*fig_id].clear()
+        # # Clearing the axes to show changes in landmarks
+        # self.vis_axs[*fig_id].clear()
 
         self.vis_axs[*fig_id].set_title("Trajectory and Landmarks")
-        PlotUtils._plot_trajectory(self.vis_axs[*fig_id], pose, frame_id, plot_ground_truth=True, ground_truth=self.ground_truth)
+        PlotUtils._plot_trajectory(self.vis_axs[*fig_id], pose, frame_id, plot_ground_truth=False, ground_truth=self.ground_truth)
         PlotUtils._plot_landmarks(self.vis_axs[*fig_id], pose, state, frame_id)
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
