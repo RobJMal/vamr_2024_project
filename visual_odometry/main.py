@@ -116,6 +116,7 @@ class VisualOdometryPipeline(BaseClass):
 
     def _init_dataset(self, dataset: DataSet, use_bootstrap: bool) -> Tuple[State, Sequence[int], NDArray]:
         self._get_dataset_metadata(dataset)
+        self.dataset = dataset
 
         #  Bootstrap
         if use_bootstrap:
@@ -217,6 +218,11 @@ class VisualOdometryPipeline(BaseClass):
         self.vis_axs[*fig_id].set_xlabel("X position")
         self.vis_axs[*fig_id].set_ylabel("Z position")
 
+        if self.dataset == DataSet.PARKING:
+            self.vis_axs[*fig_id].set_ylim(-10, 10)
+        elif self.dataset == DataSet.KITTI:
+            self.vis_axs[*fig_id].set_xlim(-10, 10)
+
     def _plot_trajectory_and_landmarks(self, fig_id: Tuple[int, int], pose: Pose, state: State, frame_id: int = 0):
         """
         Plots the trajectory and the landmarks. Plots only the x and z coordinates since the camera
@@ -280,6 +286,7 @@ class VisualOdometryPipeline(BaseClass):
 
         self.vis_axs[*fig_id].imshow(image, cmap="gray")
         self.vis_axs[*fig_id].scatter(state.P[0, :], state.P[1, :], color="red", s=2)
+        self.vis_axs[*fig_id].legend(["Keypoints"])
 
     def _plot_vo_vis_main(self, pose: Pose, state: State, image: np.ndarray, frame_id: int=0):
         """
