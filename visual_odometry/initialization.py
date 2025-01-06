@@ -21,6 +21,7 @@ class Initialization(BaseClass):
         self._info_print("Initialization initialized.")
 
         # TODO: retrieve required parameters from the ParamServer
+        self.params = param_server["initialization"]
 
 
     @BaseClass.plot_debug
@@ -80,21 +81,21 @@ class Initialization(BaseClass):
 
         points_3D_wrt_0 = points_4D_homogenous_wrt_0[:3, :] / points_4D_homogenous_wrt_0[3, :]
         points_3D_wrt_1 = R_1_wrt_0 @ points_3D_wrt_0 + t_1_wrt_0
-        rejection_mask = (points_3D_wrt_0[2, :] < 0) | (points_3D_wrt_1[2, :] < 0)
+        rear_rejection_mask = (points_3D_wrt_0[2, :] < 0) | (points_3D_wrt_1[2, :] < 0)
 
-        rejected_pts = points_3D_wrt_0[:, rejection_mask]
+        rejected_pts = points_3D_wrt_0[:, rear_rejection_mask]
         self._debug_print(f"Rejecting: {rejected_pts.shape} points due to triangulation behind the camera")
 
+        outlier_rejection_mask = self._get_outlier_rejection_mask(points_3D_wrt_0, points_3D_wrt_0, self.params["outlierRejectionZThreshold"])
+        self._debug_print(
+            f"Removing {np.sum(outlier_rejection_mask)}/{points_3D_wrt_0.shape[1]} outlier landmarks")
+        rejection_mask = rear_rejection_mask | outlier_rejection_mask
+        self._info_print(
+            f"Removing {np.sum(rejection_mask)}/{points_3D_wrt_0.shape[1]} total landmarks")
 
         state.P = inliers_0.T[:, ~rejection_mask]
         state.X = points_3D_wrt_0[:, ~rejection_mask]
-        # state.C = inliers_0.T[:, ~rejection_mask]
-        # state.F = inliers_0.T[:, ~rejection_mask]
-
-        # R_cam2_wrt_world = R # R.T
-        # t_cam2_wrt_world = t # -R.T @ t
         transform = PoseEstimator.cvt_rot_trans_to_pose(np.eye(3), np.zeros((3, 1))).reshape((-1, 1)) # Convert to transform vector
-        # state.Tau = np.tile(transform, state.P.shape[1])
 
         # Compare the bootstrapped keypoints with the keypoints from exercise 7
         if is_KITTI:
@@ -104,6 +105,21 @@ class Initialization(BaseClass):
         self._refresh_figures()
 
         return state
+
+    @staticmethod
+    def _get_outlier_rejection_mask(X_curr, X_new, threshold):
+        """
+        From a set of landmarks, X_new;
+        Remove outliers based on a stddev threshold from statistics of the current landmarks X_curr
+        """
+        mean = np.mean(X_curr, axis=1)[:, None]
+        stddev = np.std(X_curr, axis=1)[:, None]
+
+        zscore_all_dim = np.abs((X_new - mean) / stddev)
+        zscore_avg = np.average(zscore_all_dim, axis=0)
+
+        reject_mask = zscore_avg > threshold
+        return reject_mask
     
     @staticmethod
     def get_harris_keypoints_and_sift_descriptors(image: np.ndarray):

@@ -341,18 +341,6 @@ class LandmarkTriangulation(BaseClass):
         angles = np.zeros(C.shape[1], dtype=np.float32)
         angles[:] = np.nan
 
-        # unique_Tau, indx, inverse_indices = np.unique(Tau, return_index=True, return_inverse=True, axis=1)
-
-        # # Create groups by unique Tau values
-        # grouped_indices = np.split(np.argsort(inverse_indices), np.unique(np.sort(inverse_indices), return_index=True)[1])
-        # for group_cnt, group_idx in enumerate(grouped_indices):
-        #     if group_idx.size == 0:
-        #         continue
-        #     cs = C[:, group_idx]
-        #     fs = F[:, group_idx]
-        #     taus = np.unique(Tau[:, group_idx], axis=1)
-        #     assert taus.shape[1] == 1, "something went wrong with the whole unique tau shabang"
-
         for cnt, (cs, fs, taus) in enumerate(zip(C.T, F.T, Tau.T)):
             group_idx = np.array([cnt])
             taus = taus[:, None]
@@ -432,7 +420,6 @@ class LandmarkTriangulation(BaseClass):
         Tau_remain = Tau[:, ~selection_mask]
 
         # rank the remaining candidates based on dist from existing and angle
-
         angle_rank = np.argsort(angles[selection_mask])
         distance_rank = np.argsort(
             np.mean(cdist(updated_state.P.T, P_new.T, metric="cityblock")))
@@ -449,17 +436,14 @@ class LandmarkTriangulation(BaseClass):
         P_new = P_new[:, rank]
         X_new = X_new[:, rank]
 
-        # combined_rank = small_indices + close_to_landmarks_indices
-        # rank_indices = np.argsort(combined_rank)[: (angles.shape[0] - num_to_add)]
-        # angles[rank_indices] = 0
-
         self._info_print(
             f"Found {np.sum(eligible_keypoint_mask)} new landmarks to add to the queue. {np.sum(~eligible_keypoint_mask)} candidates remain."
         )
 
         return P_new, X_new, C_remain, F_remain, Tau_remain
 
-    def _get_outlier_rejection_mask(self, X_curr, X_new, threshold):
+    @staticmethod
+    def _get_outlier_rejection_mask(X_curr, X_new, threshold):
         """
         From a set of landmarks, X_new;
         Remove outliers based on a stddev threshold from statistics of the current landmarks X_curr
@@ -473,7 +457,7 @@ class LandmarkTriangulation(BaseClass):
         reject_mask = zscore_avg > threshold
         return reject_mask
 
-    @ BaseClass.plot_debug
+    @BaseClass.plot_debug
     def _plot_reproj_error_summary(self, fig_id: Tuple[int, int], error, mask):
         x_ax = np.arange(error.shape[0])
         self.vis_axs[*fig_id].scatter(x_ax[mask], error[mask],
