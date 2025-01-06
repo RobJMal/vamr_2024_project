@@ -40,7 +40,7 @@ landmark_triangulation:
   maxNewKeypointsPerIter: 100 # Create n windows and select one point from this. Must be a square number since we use windowing to achieve this
   applyWindowThresholding: false
   reprojectionErrorThreshold: 2.0 # pixel distance
-  applyReprojectionErrorRejection: false
+  applyReprojectionErrorRejection: true
   outlierRejectionZThreshold: 3 # how many stddev away from the mean we want to reject outliers
   equalKeypointThreshold: 8.0 # num_pixels manhatten radius around a newly detected keypoint to be considered the same as an existing keypoint
   maxNumLandmarks: 500
