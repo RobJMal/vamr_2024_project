@@ -70,7 +70,10 @@ class PoseEstimator(BaseClass):
             confidence=self.params["pnp_ransac_confidence"]
         )
 
-        # self._plot_pose_and_landmarks((0, 0), init_pose, state, plot_title="Pose and Landmarks")
+        if self.debug >= LogLevel.VISUALIZATION:
+            rot_matrix_wrt_camera_vis, _ = cv2.Rodrigues(rot_vec_cam_wrt_w)
+            pose_estimation = self.cvt_rot_trans_to_pose(rot_matrix_wrt_camera_vis, trans_vec_cam_wrt_w)
+            self._plot_pose_and_landmarks((0, 0), pose_estimation, state, plot_title="Pose and Landmarks")
 
         # Applying nonlinear optimization using inliers
         if self.params["use_reprojection_error_optimization"]:
@@ -91,10 +94,9 @@ class PoseEstimator(BaseClass):
             # Visualizing the inliers used for pose estimation after optimization
             if self.debug >= LogLevel.VISUALIZATION:
                 rot_matrix_wrt_camera_vis, _ = cv2.Rodrigues(rot_vec_cam_wrt_w)
-
                 pose_estimation_with_inliers = self.cvt_rot_trans_to_pose(rot_matrix_wrt_camera_vis, trans_vec_cam_wrt_w)
 
-                self._plot_pose_and_landmarks((0, 1), pose_estimation_with_inliers, state_inliers, plot_title="Pose and Landmarks (using Inliers)")
+                self._plot_pose_and_landmarks((0, 1), pose_estimation_with_inliers, state_inliers, plot_title="Pose and Landmarks (using inliers only)")
                 self._plot_inliers_percentage_history((1, 0), state, state_inliers, frame_id=frame_id)
                 self._plot_num_inliers_history((1, 1), state, frame_id=frame_id)
 
