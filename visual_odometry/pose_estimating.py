@@ -54,15 +54,6 @@ class PoseEstimator(BaseClass):
         :param init_pose: Initial pose of the camera.
         :type init_pose: Pose
         """
-        init_rot_matrix = init_pose[:3, :3]
-        init_trans_vec = init_pose[:3, 3]
-
-        # Converting initial pose of camera to camera frame
-        init_rot_matrix_wrt_camera = init_rot_matrix.T
-        init_trans_vec_wrt_camera = -init_rot_matrix.T @ init_trans_vec
-        init_trans_vec_wrt_camera = init_trans_vec_wrt_camera.reshape(3, 1)
-        init_rot_vec_wrt_camera, _ = cv2.Rodrigues(init_rot_matrix_wrt_camera)
-
         # Assuming no distortion
         distortion_matrix = np.zeros((1,5))
 
@@ -72,9 +63,6 @@ class PoseEstimator(BaseClass):
             imagePoints=state.P.T, 
             cameraMatrix=K_matrix,            
             distCoeffs=distortion_matrix, 
-            rvec=init_rot_vec_wrt_camera,
-            tvec=init_trans_vec_wrt_camera,
-            useExtrinsicGuess=False,
             iterationsCount=self.params["pnp_ransac_iterations"],
             reprojectionError=self.params["pnp_ransac_reprojection_error"],
             confidence=self.params["pnp_ransac_confidence"]
