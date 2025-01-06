@@ -322,11 +322,11 @@ class VisualOdometryPipeline(BaseClass):
         self._plot_trajectory_and_landmarks((0, 1), pose, state, frame_id)
         self._plot_full_trajectory((1, 1), pose, frame_id)
 
-        # Makes sure that plots refresh
-        self._refresh_figures()
-        time.sleep(0.01)
+        # # Makes sure that plots refresh
+        # self._refresh_figures()
+        # time.sleep(0.01)
 
-        self.vis_figure.savefig(os.path.join(f'screencasts/{dataset.name}', f'frame_{frame_id:04d}.png'))
+        # self.vis_figure.savefig(os.path.join(f'screencasts/{dataset.name}', f'frame_{frame_id:04d}.png'))
     # endregion
 
     # region RUN
@@ -358,9 +358,9 @@ class VisualOdometryPipeline(BaseClass):
 
             new_state, new_pose = self._process_frame(image, prev_image, state, frame_id, prev_pose, dataset)
 
-            # # Makes sure that plots refresh
-            # self._refresh_figures()
-            # time.sleep(0.01)
+            # Makes sure that plots refresh
+            self._refresh_figures()
+            time.sleep(0.01)
 
             # Prepare for the next iteration
             prev_image = image
